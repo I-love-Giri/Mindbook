@@ -1,0 +1,230 @@
+# INTRODUCTION
+
+```
+PROJECT:
+Extract YouTube Video IDs from different URL formats.
+
+SUPPORTED URL TYPES:
+
+1. Standard URL
+https://www.youtube.com/watch?v=dQw4w9WgXcQ
+
+2. Short URL
+https://youtu.be/dQw4w9WgXcQ
+
+3. Embed URL
+https://youtube.com/embed/dQw4w9WgXcQ
+
+4. Shorts URL
+https://youtube.com/shorts/dQw4w9WgXcQ
+
+GOAL:
+Return only the video ID.
+
+Example:
+dQw4w9WgXcQ
+```
+
+
+# IMPORTS
+
+```
+=========================================
+IMPORTS
+=========================================
+
+Optional means:
+The function may return:
+    - a string
+    - OR None
+
+from typing import Optional
+
+
+urlparse:
+Splits a URL into components
+
+Example:
+https://youtube.com/watch?v=abc123
+
+scheme   -> https
+hostname -> youtube.com
+path     -> /watch
+query    -> v=abc123
+
+parse_qs:
+Converts query parameters into a dictionary
+
+from urllib.parse import urlparse, parse_qs
+```
+# Main Funciton : get_video_id
+
+```
+
+========================================= MAIN FUNCTION =========================================
+
+def get_video_id(url: str) -> Optional[str]:
+
+    Parse the URL into components
+    parsed = urlparse(url)
+
+    -------------------------------------
+    CASE 1:
+    Short URL
+
+    Example:
+    https://youtu.be/abc123
+    -------------------------------------
+
+    if parsed.hostname == "youtu.be":
+
+        parsed.path = "/abc123"
+
+        [1:]
+        removes the first "/"
+
+        return parsed.path[1:].split("?")[0]
+
+    -------------------------------------
+    CASE 2:
+    Normal YouTube URLs
+    -------------------------------------
+
+    if parsed.hostname in ("youtube.com", "www.youtube.com"):
+
+        ---------------------------------
+        FORMAT:
+        /watch?v=abc123
+        ---------------------------------
+
+        if parsed.path == "/watch":
+
+            Convert query string into dictionary
+
+            "v=abc123"
+
+            becomes:
+            {'v': ['abc123']}
+
+            qs = parse_qs(parsed.query)
+
+            Extract video ID
+
+            return qs.get("v", [None])[0]
+
+        ---------------------------------
+        Other URL formats:
+
+        /embed/
+        /v/
+        /shorts/
+        ---------------------------------
+
+        for prefix in ("/embed/", "/v/", "/shorts/"):
+
+            Check if path starts with prefix
+
+            if parsed.path.startswith(prefix):
+
+                Example:
+                /embed/abc123
+
+                split("/") becomes:
+                ['', 'embed', 'abc123']
+
+                index [2] contains video ID
+
+                return parsed.path.split("/")[2]
+
+    No valid video ID found
+
+    return None
+```
+# UNDERSTANDING urlparse()
+```
+ =========================================
+ UNDERSTANDING urlparse()
+ =========================================
+
+from urllib.parse import urlparse
+
+url = "https://www.youtube.com/watch?v=abc123"
+
+parsed = urlparse(url)
+
+print("SCHEME:", parsed.scheme)
+
+print("HOSTNAME:", parsed.hostname)
+
+print("PATH:", parsed.path)
+
+print("QUERY:", parsed.query)
+```
+# UNDERSTANDING parse_qs()
+```
+ =========================================
+ UNDERSTANDING parse_qs()
+ =========================================
+
+from urllib.parse import parse_qs
+
+query = "v=abc123&name=test"
+
+parsed_query = parse_qs(query)
+
+print(parsed_query)
+
+ Expected Output:
+
+ {
+     'v': ['abc123'],
+     'name': ['test']
+ }
+```
+# PROGRAM FLOW
+```
+PROGRAM FLOW
+
+STEP 1:
+Receive URL
+
+STEP 2:
+Parse URL into components
+
+STEP 3:
+Check hostname
+
+IF hostname == youtu.be
+    Extract from path
+
+ELSE IF hostname == youtube.com
+
+    IF path == /watch
+        Extract "v" parameter
+
+    ELSE IF path starts with:
+        /embed/
+        /v/
+        /shorts/
+
+        Extract from path
+
+STEP 4:
+Return video ID
+
+STEP 5:
+If nothing matched
+Return None
+```
+
+# THINGS I LEARNED
+```
+1. URL parsing
+2. Query parameters
+3. Type hints
+4. String slicing
+5. split()
+6. startswith()
+7. Defensive coding
+8. Multiple URL handling
+```
