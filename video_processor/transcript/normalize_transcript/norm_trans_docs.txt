@@ -1,0 +1,347 @@
+Imagine you downloaded subtitles/transcript from a YouTube video.
+
+The transcript might look messy because some items are dictionaries and some are objects.
+
+This function converts everything into one clean list called `normalized`.
+
+---
+
+# Imagine this transcript
+
+Suppose this is the original transcript:
+
+```python
+transcript = [
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    },
+
+    {
+        "text": "Welcome to Python tutorial",
+        "start": 2.5,
+        "duration": 3.0
+    }
+]
+```
+
+---
+
+# Step 1
+
+Function starts:
+
+```python
+normalized = []
+```
+
+At this moment:
+
+```python
+normalized = []
+```
+
+EMPTY list.
+
+---
+
+# Loop Starts
+
+```python
+for t in transcript:
+```
+
+The function picks one transcript line at a time.
+
+---
+
+# FIRST LOOP
+
+Now:
+
+```python
+t = {
+    "text": "Hello everyone",
+    "start": 0.0,
+    "duration": 2.5
+}
+```
+
+---
+
+## Check
+
+```python
+isinstance(t, dict)
+```
+
+YES.
+
+Because `t` is a dictionary.
+
+---
+
+# This runs
+
+```python
+normalized.append({
+    "text": t.get("text", ""),
+    "start": t.get("start", 0),
+    "duration": t.get("duration", 0),
+})
+```
+
+This creates:
+
+```python
+{
+    "text": "Hello everyone",
+    "start": 0.0,
+    "duration": 2.5
+}
+```
+
+and stores it inside `normalized`.
+
+---
+
+# Now normalized becomes:
+
+```python
+normalized = [
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    }
+]
+```
+
+---
+
+# SECOND LOOP
+
+Now:
+
+```python
+t = {
+    "text": "Welcome to Python tutorial",
+    "start": 2.5,
+    "duration": 3.0
+}
+```
+
+Again dictionary.
+
+So append again.
+
+---
+
+# normalized becomes:
+
+```python
+normalized = [
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    },
+
+    {
+        "text": "Welcome to Python tutorial",
+        "start": 2.5,
+        "duration": 3.0
+    }
+]
+```
+
+---
+
+# Finally returned
+
+```python
+return normalized
+```
+
+So output is:
+
+```python
+[
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    },
+
+    {
+        "text": "Welcome to Python tutorial",
+        "start": 2.5,
+        "duration": 3.0
+    }
+]
+```
+
+---
+
+# But WHY use this function then?
+
+Because sometimes transcript is NOT a dictionary.
+
+Sometimes transcript comes like this:
+
+---
+
+# Object Version
+
+```python
+class Snippet:
+    def __init__(self, text, start, duration):
+        self.text = text
+        self.start = start
+        self.duration = duration
+```
+
+Transcript:
+
+```python
+transcript = [
+    Snippet("Hello everyone", 0.0, 2.5),
+    Snippet("Welcome to Python tutorial", 2.5, 3.0)
+]
+```
+
+These are OBJECTS, not dictionaries.
+
+---
+
+# During first loop
+
+```python
+t = Snippet("Hello everyone", 0.0, 2.5)
+```
+
+Now:
+
+```python
+isinstance(t, dict)
+```
+
+is FALSE.
+
+So code goes into:
+
+```python
+else:
+```
+
+---
+
+# This runs
+
+```python
+normalized.append({
+    "text": getattr(t, "text", ""),
+    "start": getattr(t, "start", 0),
+    "duration": getattr(t, "duration", 0),
+})
+```
+
+This reads:
+
+```python
+t.text
+t.start
+t.duration
+```
+
+and converts object into dictionary.
+
+---
+
+# So normalized stores:
+
+```python
+normalized = [
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    }
+]
+```
+
+---
+
+# BIG IDEA OF THIS FUNCTION
+
+The function says:
+
+> "I don't care whether transcript comes as dictionary or object.
+> I will convert everything into ONE SAME FORMAT."
+
+---
+
+# Final standard format
+
+Every transcript line becomes:
+
+```python
+{
+    "text": "...",
+    "start": ...,
+    "duration": ...
+}
+```
+
+---
+
+# Real-life Analogy
+
+Imagine students submit forms in different formats:
+
+Some submit:
+
+```python
+{"name": "Rahul"}
+```
+
+Others submit:
+
+```python
+student.name
+```
+
+Your function standardizes ALL forms into:
+
+```python
+{"name": "..."}
+```
+
+So later your code becomes easier.
+
+---
+
+# What EXACTLY stores in normalized?
+
+A CLEAN transcript list.
+
+Like this:
+
+```python
+normalized = [
+    {
+        "text": "Hello everyone",
+        "start": 0.0,
+        "duration": 2.5
+    },
+
+    {
+        "text": "Welcome to Python tutorial",
+        "start": 2.5,
+        "duration": 3.0
+    }
+]
+```
+
+Every line/subtitle becomes a proper dictionary.
