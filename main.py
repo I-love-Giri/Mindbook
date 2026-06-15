@@ -1,17 +1,25 @@
-from video_processor.video_id.get_video_id import get_video_id
-
-def main():
-    urls = [
-        "https://youtu.be/abc123",
-        "https://www.youtube.com/watch?v=xyz789",
-        "https://youtube.com/embed/HELLO123",
-        "https://youtube.com/shorts/SHORT999",
-        "https://google.com"
-    ]
-
-    for url in urls:
-        print(f"{url} -> {get_video_id(url)}")
+import threading
+from video_processor.transcript.private_strategies.yt_dlp_vtt_subtitle.vtt_subtitle_extraction import _strat_ytdlp
+from video_processor.utilities.video_id.get_video_id import get_video_id
 
 
-if __name__ == "__main__":
-    main()
+class video_processor:
+    def __init__(self):
+        pass
+
+    def extract_transcript(self , url: str , api_key: str= " ")->list[dict]:
+
+        '''  Tiered strategy:
+          1–4  run concurrently (timedtext, yt-dlp VTT, ytt-api+cookies, ytt-api direct)
+        '''
+
+        video_id = get_video_id(url)
+
+        cancel_evt = threading.Event()
+
+        fast: list[tuple[str, callable[[],list]]] = []
+
+        if video_id:
+            fast.append(("timedtext",lambda: self._strat_timedtext(video_id)))
+            fast.append(    ("yt-dlp vtt",
+                          lambda: self._strat_ytdlp(url, cancel_evt)))
