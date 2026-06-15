@@ -1,7 +1,9 @@
-from asyncio.log import logger
 import yt_dlp
 from make_ydl_opts import _make_ydl_opts
 from typing import download
+import logging
+
+logger = logging.getLogger(__name__)
 
 def extract_chapters_and_info(url: str)->dict:
 

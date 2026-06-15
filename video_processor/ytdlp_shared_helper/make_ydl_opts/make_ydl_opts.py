@@ -1,5 +1,6 @@
 from typing import Optional
 
+YDL_CLIENTS = ["ios", "android", "web","desktop","tv_embedded"]
 
 def _make_ydl_opts(
         outtemp: str,
