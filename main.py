@@ -23,3 +23,4 @@ class video_processor:
             fast.append(("timedtext",lambda: self._strat_timedtext(video_id)))
             fast.append(    ("yt-dlp vtt",
                           lambda: self._strat_ytdlp(url, cancel_evt)))
+            
