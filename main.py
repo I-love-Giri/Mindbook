@@ -1,6 +1,9 @@
 import sys
 
 from video_processor.services.parser import extract_video_id
+from video_processor.services.youtube_service import fetch_transcript
 
 if __name__ == "__main__":
-    extract_video_id(sys.argv[1])
+    id = extract_video_id(sys.argv[1])
+    print(id)
+    fetch_transcript(id)
