@@ -1,48 +1,97 @@
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound
-
+from models import Transcript, Segment
 import json
 
-def fetch_transcript(video_id: str):
 
-    api = YouTubeTranscriptApi()
-    transcript_list = api.list(video_id)
+class YoutubeTranscriptService:
 
-    #print(f"transcript_list: {transcript_list}")
+    def __init__(self):
+        self.api = YouTubeTranscriptApi
 
-    languages = [t.language_code for t in transcript_list]
+    def fetch_transcript(self, video_id: str):
 
-    try:
+        api = YouTubeTranscriptApi()
+        transcript_list = api.list(video_id)
 
-        transcript = transcript_list.find_manually_created_transcript(
-           languages
-        )
+        # print(f"transcript_list: {transcript_list}")
 
-    except NoTranscriptFound:
-        transcript = transcript_list.find_generated_transcript(
-            languages
-        )
-    
-    fetched = transcript.fetch()
+        languages = [t.language_code for t in transcript_list]
 
-    segments = [ 
-        {
-            "text": snippet.text,
-            "start": snippet.start,
-            "duration": snippet.duration
+        try:
+            transcript = transcript_list.find_manually_created_transcript(
+                languages
+            )
+        except NoTranscriptFound:
+            transcript = transcript_list.find_generated_transcript(
+                languages
+            )
 
-        }
+        fetched = transcript.fetch()
 
-    for snippet in fetched
-    ]
+        '''
+        It's just a shorter way of writing:
 
-    return transcript.language_code, segments
+        segments = []
+
+        for seg in fetched:
+            segments.append({
+                 "text": seg.text,
+                 "start": seg.start,
+                 "duration": seg.duration,
+            })
+        '''
+
+        segments = [Segment( text = snippet.text,
+                            start = snippet.start,
+                             duration = snippet.duration )
+                    
+                   for snippet in fetched ]
+
+        return transcript(language_code = transcript.language_code,
+                          video_id = transcript.video_id,
+                          language = transcript.language,
+                          segments = segments)
 
     
 '''
 
-with open(f"{video_id}_transcript.json", "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+User gives video_id
+        │
+        ▼
+Connect to YouTube Transcript API
+        │
+        ▼
+List all available transcripts
+        │
+        ▼
+Try manual transcript
+        │
+   ┌────┴─────┐
+   │          │
+Found?      Not Found
+   │          │
+   ▼          ▼
+Use it   Try generated transcript
+   │          │
+   └────┬─────┘
+        ▼
+Fetch transcript data
+        ▼
+Convert individual segments or snippet of fetched transcript into:
+ {
+   text,
+   start,
+   duration
+ }
+        │
+        ▼
+Return:
+(language, segments)
+
+
+
+------------------------------------------------------------------------
 
 
 how transcripts list appear : 
@@ -76,5 +125,10 @@ None
 Initial fetched Data : 
 
 FetchedTranscriptSnippet(text='anyway. Time is never on your side. So', start=777.44, duration=5.8), FetchedTranscriptSnippet(text='use it.', start=780.0, duration=3.24), FetchedTranscriptSnippet(text='Hey,', start=813.839, duration=3.0), FetchedTranscriptSnippet(text='hey, hey.', start=822.16, duration=3.0)], video_id='9S-uO10nXcE', language='English (auto-generated)', language_code='en', is_generated=True
+
+fetch() returns FetchedTranscriptSnippet objects (with attributes like .text, .start, .duration)
+
+with open(f"{video_id}_transcript.json", "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 '''
