@@ -1,13 +1,13 @@
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound
-from models import Transcript, Segment
+from video_processor.models.transcript import Segment, Transcript
 import json
-
-
 class YoutubeTranscriptService:
 
+    '''
     def __init__(self):
         self.api = YouTubeTranscriptApi
+    '''
 
     def fetch_transcript(self, video_id: str):
 
@@ -48,7 +48,7 @@ class YoutubeTranscriptService:
                     
                    for snippet in fetched ]
 
-        return transcript(language_code = transcript.language_code,
+        return Transcript(language_code = transcript.language_code,
                           video_id = transcript.video_id,
                           language = transcript.language,
                           segments = segments)

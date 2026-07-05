@@ -51,7 +51,7 @@ def transcript_to_timestamped(transcript):
     lines = []
 
     for segment in transcript.segments:
-        lines.append(f"[{format_timestamp(segment.start)}] {segment.txt}")
+        lines.append(f"[{format_timestamp(segment.start)}] {segment.text}")
 
     return "\n".join(lines)
 
@@ -76,4 +76,4 @@ and format_timestamp() returns timestamps like 00:00, 00:05, and 00:12, then the
 
 def transcript_to_text(transcript):
 
-    return transcript.txt
+    return transcript.text

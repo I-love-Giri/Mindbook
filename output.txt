@@ -1,0 +1,403 @@
+[00:00:00] hi guys in this video I'm going to
+[00:00:02] discuss with you graph traversal
+[00:00:03] techniques two types of graph traversal
+[00:00:06] techniques are there BFS and
+[00:00:09] BFS BFS means breadth-first search or
+[00:00:14] sometimes it is also known as level
+[00:00:16] order traversal and the DFS s
+[00:00:20] depth-first search fine so we'll take
+[00:00:24] this example and with the help of this
+[00:00:26] example I am going to discuss with you
+[00:00:28] the BFS traversal fine in BFS traversal
+[00:00:33] when you will start then you can take
+[00:00:34] any node as a root node you can start
+[00:00:38] traversing this graph from any node
+[00:00:40] suppose we can take a zero you can take
+[00:00:43] one you can take six as a root node and
+[00:00:45] you can start your driver self fine but
+[00:00:48] sometimes intuition if it is given that
+[00:00:51] BFS Traverse will find out can I have
+[00:00:53] this graph and considering two as a root
+[00:00:56] node then what you have to do is you're
+[00:00:58] supposed to start from this two to
+[00:01:02] approve not consider curve and you will
+[00:01:03] start traversing this graph from this
+[00:01:05] node only generally suppose in this
+[00:01:08] example nothing is given then we will
+[00:01:10] consider zero as a root node I am just
+[00:01:13] considering zero as a root node you can
+[00:01:15] consider one Phi for any node okay so
+[00:01:19] for BFS traversal what a data structure
+[00:01:21] is used that is q queue data structure
+[00:01:24] would be used fine and here you'll write
+[00:01:31] will print the result and this is our
+[00:01:34] data structure that is Q I hope
+[00:01:37] everybody knows you work in what fashion
+[00:01:40] that is FIFO first-in first-out okay so
+[00:01:45] in this traversal suppose we have taken
+[00:01:47] 0 as a root node okay
+[00:01:51] all the adjacent vertices of this 0 will
+[00:01:56] be traversed first multiply to traverse
+[00:01:59] all the vertices as close as possible to
+[00:02:03] the root vertex C is K close the eye
+[00:02:07] scared this into put no vertices give me
+[00:02:08] here 1 and 3 to 0 is it or how about 1
+[00:02:12] or 3 or either 3 or
+[00:02:14] one in any fashion a visit only after
+[00:02:16] that you would move forward
+[00:02:17] SN you're working zero key about one
+[00:02:19] visit can you yeah then you would visit
+[00:02:21] five okay first of all it may be what
+[00:02:25] ourselves only as close as possible to
+[00:02:27] this zero those who are what it says
+[00:02:30] would be visited fine okay now see
+[00:02:34] suppose we have taken zero as a root
+[00:02:36] node so 0 would be inserted in this
+[00:02:39] queue fine okay now in the result we
+[00:02:47] have suppose we have deleted in this 0
+[00:02:49] and we have printed this zero in the
+[00:02:51] result fine now as soon as the zero is
+[00:02:55] printed means zero has been visited
+[00:02:59] right now next thing what you have to do
+[00:03:02] is zero purchasing has a delete over
+[00:03:04] okay it may be adjacent what this assume
+[00:03:07] is you're okay that would be inserted in
+[00:03:09] this queue now adjacent what this is
+[00:03:11] over the zero is 1 and 3 fine and one
+[00:03:15] entry would be inserted in this cube 1
+[00:03:17] or 3 it's not like if one would be
+[00:03:20] inserted and after that 3 you can insert
+[00:03:22] three or one in any order you can insert
+[00:03:25] fine ok now one and three ok now next is
+[00:03:31] next element in queue is one now one
+[00:03:34] would be deleted and what one would be
+[00:03:37] printed means one go how many delete
+[00:03:39] kill the edit one has all has already
+[00:03:42] been visited the say print format loved
+[00:03:46] one has already been visited now next
+[00:03:48] thing what you have to do is one get it
+[00:03:51] maybe at the same to what this is all
+[00:03:54] the dis in tortoises of one adjacent
+[00:03:57] vertices plus unvisited vertices fine
+[00:04:03] adjacent unvisited vertices of one
+[00:04:06] wouldn't be inserted in this queue see
+[00:04:10] how many i descend vertices of one are
+[00:04:12] there 0 3 2 5 and 6 the medic death you
+[00:04:18] 0 3 2 5 and 6 but up go insert is makan
+[00:04:26] say can hear only the
+[00:04:27] visited what this's zero has already
+[00:04:30] been visited fine zero has already been
+[00:04:35] in visitor to zero copies mini insert
+[00:04:37] karoge and three three has already been
+[00:04:39] inserted fine
+[00:04:42] the yeah be a boys main certain he
+[00:04:43] Colonel Khan say is main certain gate to
+[00:04:47] five and six to five and six you can
+[00:04:53] insert two five six in any order that is
+[00:04:56] you can insert five two and six you can
+[00:04:58] insert two six five you can insert six
+[00:05:00] five and two it is not compulsory that
+[00:05:03] you'll insert two five and six only okay
+[00:05:07] now next is three fine three you go
+[00:05:13] hominid I said delete here and three
+[00:05:16] would be printed and what are the
+[00:05:18] adjacent vertices of this three find out
+[00:05:21] those see this go home find out Korea
+[00:05:24] all the adjacent vertices of any node
+[00:05:28] score both exploration of that node you
+[00:05:30] are going to explore that node fine
+[00:05:33] now find out that at this into vertices
+[00:05:36] of this three adjacent to vertices of
+[00:05:38] this three rc3 company print Korea means
+[00:05:42] that has already been printed or you can
+[00:05:43] say that it already been raised it ready
+[00:05:46] a fine home we have now three three
+[00:05:48] cages into what s is gone constant
+[00:05:50] upkeep as c0 hey you have one you have
+[00:05:54] four you have two for adjacent vertices
+[00:05:57] are there but inside a pecan say carne
+[00:06:00] here to visit and I knew a sc0 has
+[00:06:03] already been visited one has already
+[00:06:04] been visited and two is already there in
+[00:06:08] this queue though you would not insert
+[00:06:09] to again repeat Nanaia for the only
+[00:06:12] element left is that is for now for will
+[00:06:15] be inserted in this queue fine now check
+[00:06:21] next element that is to to be deleted
+[00:06:23] and two would be printed means 2 has
+[00:06:26] already been visited now find out at the
+[00:06:28] st. element of this two adjacent element
+[00:06:30] of this to r1 this 3 this 4 and this 5
+[00:06:36] for element we have one is already
+[00:06:39] visited three is already visited
+[00:06:41] four is already there in this queue only
+[00:06:43] left is five no sorry five is already
+[00:06:46] there in this queue so there is nothing
+[00:06:48] to insert in this queue okay now move to
+[00:06:52] the next part next element that is five
+[00:06:55] five first is deleted from this queue
+[00:06:57] and five would be printed means five
+[00:07:01] husband visited now find out adjacent
+[00:07:04] vertices of five one we have what we
+[00:07:07] have - but these are already visited
+[00:07:09] don't know what this is there to be
+[00:07:11] inserted in this queue okay now check
+[00:07:14] the next six six would be deleted and
+[00:07:17] printed fine 6 min already visited at
+[00:07:21] the same vertices of six are one we are
+[00:07:24] not supposed to insert this one because
+[00:07:26] this is already visited and one is four
+[00:07:28] but four is also there through here we
+[00:07:30] have this means hurt and he care of it
+[00:07:31] next up coca political my four and four
+[00:07:35] would be printed fine so this is the BFS
+[00:07:40] traversal of this graph see I'm this is
+[00:07:42] not the only BFS traversal of this graph
+[00:07:45] there are numerous valid BFS traversals
+[00:07:47] on this graph how see suppose you have
+[00:07:52] inserted in this two five six in this
+[00:07:55] fashion
+[00:07:55] five six and two two zero one three ki
+[00:07:59] baat karta happy - octopus take care so
+[00:08:04] it depends how you are going to insert
+[00:08:06] these numbers into this queue so I'm not
+[00:08:12] saying so this is the only welded DFS
+[00:08:14] traversal you can find out numerous
+[00:08:16] value DFS traversal of this graph using
+[00:08:19] this method fine now we will discuss the
+[00:08:25] DFS traversal of this graph now we would
+[00:08:29] find out the DFS traversal of this graph
+[00:08:32] DFS means depth first search traversal
+[00:08:36] of this graph okay in BFS queue data
+[00:08:39] structure is used and as in DFS what
+[00:08:42] data structure will be used that is
+[00:08:44] stuck and it works only for minute last
+[00:08:47] in first out okay so we'll have one
+[00:08:51] stack
+[00:08:52] fine and here we'll write down the
+[00:08:57] result of this trevor self-same in that
+[00:09:02] BFS we have taken any node as root node
+[00:09:04] so in DFS also you can take any node as
+[00:09:06] root node and you can start traversing
+[00:09:08] from that node okay
+[00:09:10] in case if it is given that consider one
+[00:09:14] as a root node in that case of 100 root
+[00:09:16] node Elaina he pareja but then he give
+[00:09:18] and HECO you can take any notice root
+[00:09:20] node suppose we are taking zero as root
+[00:09:22] node okay now see zero would be inserted
+[00:09:27] in this stack fine and zero would be
+[00:09:32] printed okay now check how many addition
+[00:09:37] what this is of zero are there 1 and 3
+[00:09:40] so BFS may have any idea how all the
+[00:09:43] adjacent vertices of that node Dominic
+[00:09:45] you say delete here just go print yeah
+[00:09:47] okay sorry adjacent what this is
+[00:09:50] commonly katha we have inserted into Q
+[00:09:53] but DFS make a alga only one any one of
+[00:09:58] that node would be inserted into stack
+[00:10:04] depth-first search belly hump depth
+[00:10:07] measure Angus suppose zero common a key
+[00:10:09] after that we have chosen this three
+[00:10:12] fine then we would go three two next is
+[00:10:17] scared the sentiment it may be only for
+[00:10:18] hoga suppose six who or something like
+[00:10:20] that at some points we read suppose we
+[00:10:23] have reached at six fine and SK our gate
+[00:10:27] suppose I'm panicking a couch near this
+[00:10:29] this 1 to 6 is not there let us consider
+[00:10:33] those 6 k bar the panini's are set they
+[00:10:35] after that you'll backtrack you will go
+[00:10:37] to 4 busca path for K at this end image
+[00:10:40] of the in case our pockets new
+[00:10:41] multitudinous then you will backtrack
+[00:10:43] fine but depth-first search MATLAB
+[00:10:47] you'll go deeper and deeper until a dead
+[00:10:52] end dead end min soos car a descent
+[00:10:55] unvisited adjacent which many over and
+[00:10:57] you have to backtrack fine so any one of
+[00:11:01] this vertex 0 has 0 is printed to anyone
+[00:11:06] of this zero would be taken anyone
+[00:11:11] adjacent vertices of the zero will be
+[00:11:12] taken and pushed into this stack suppose
+[00:11:15] we have one we have one and three two
+[00:11:18] adjacent vertices of zero we have so you
+[00:11:20] can take either one or you can take
+[00:11:21] three suppose we are taking one one
+[00:11:27] would be printed and one would be pushed
+[00:11:29] into the stack 0k by thumb camp again
+[00:11:34] here this one after that you would
+[00:11:39] explore this one explore any explore
+[00:11:41] means you explore now they kept sorry
+[00:11:44] what this is co-op Explorer ovo Explorer
+[00:11:46] from Calcutta BFS maker thing now one
+[00:11:49] car you would take any vertex unvisited
+[00:11:53] vertex get my adjacent vertex 1 K
+[00:11:55] addition vertex given vertex con-con
+[00:11:57] same they pass 3 to 6 and 5 fine so you
+[00:12:03] can take any one of these four BFS viiia
+[00:12:07] Charaka insert name karna you take any
+[00:12:09] one of these four three to five or six
+[00:12:14] suppose we have taken this three fine
+[00:12:19] three we have taken or three pop knee
+[00:12:23] cap insert cardia high in the pushkar
+[00:12:25] their head stack may up let's go push
+[00:12:27] Korea fine so you are now it at this
+[00:12:30] three now find out adjacent vertices of
+[00:12:32] this three this for this to this one and
+[00:12:37] zero but obviously zero and one are
+[00:12:40] already visited fine
+[00:12:42] zero and one see hero's ultimate equal
+[00:12:44] zero and one already visited so
+[00:12:46] unrelated vertex up go find out Carnahan
+[00:12:49] and visited vertex Kahn same they pass
+[00:12:51] to and this for so you would take any
+[00:12:57] one of this were the these are descent
+[00:13:00] with the unbusy two vertices and you
+[00:13:03] would push that vertex into this stack
+[00:13:05] up to village therefore be less active
+[00:13:08] suppose you have taken two to go up in a
+[00:13:11] print here to go up in a push kardia
+[00:13:13] into this stack three Chabad aapke hey
+[00:13:17] ho
+[00:13:19] do fine now you are at this - now find
+[00:13:24] out at the st. vitus's of this - fine
+[00:13:27] you scared this invert this is gone same
+[00:13:29] one but you cannot push one at this one
+[00:13:32] because one is already visited you
+[00:13:34] cannot push three three is already
+[00:13:35] visited now but you have give us a
+[00:13:38] decent what this is five five cop is no
+[00:13:40] push cars are still fine and one is this
+[00:13:43] for adjacent vertex fine this five and
+[00:13:48] four so you can take either five for
+[00:13:51] either for anyone take a pulsar in a
+[00:13:54] hill a name a bar wise we focus car do
+[00:13:56] any one up quark tools come and that is
+[00:13:57] unvisited vertex or scared this end bit
+[00:14:00] notchy so you can take either four or
+[00:14:02] five suppose we have taken four for
+[00:14:06] common a push cardia and for co-op nikka
+[00:14:08] hop a spec print bigger than take a talk
+[00:14:11] about topic I am for now find out
+[00:14:14] adjacent vertices of this for fine three
+[00:14:19] here but three is already visited two
+[00:14:21] two is already visited and one is six
+[00:14:23] yeah you can push 6 because 6 is 2 and
+[00:14:27] visited the for Capcom bad kappa going
+[00:14:30] up six three six print table and six
+[00:14:33] would be pushed in this stay now find
+[00:14:38] out after six is there any unvisited
+[00:14:41] adjacent to vertices of six he scared
+[00:14:45] this and what this is for but for is
+[00:14:46] already visited adjacent verses of 6 1
+[00:14:49] is 1 1 is already visited and we have
+[00:14:53] only 1 and 4 so no unvisited adjacent
+[00:14:57] vertices is there fine
+[00:14:59] yeah happy cuyahoga now you cannot move
+[00:15:03] you know further from the six deep me up
+[00:15:07] 6k 1 these are certificates you do not
+[00:15:09] have any unvisited at the central doses
+[00:15:11] of six charges of to do you have a yoga
+[00:15:15] backtracking a backtracking case yoga
+[00:15:18] backtracking me Jonica except attach
+[00:15:20] alegre from this step again I see
+[00:15:23] situation at the Ava hop a key out here
+[00:15:25] one can one that stop is there the
+[00:15:29] topmost element is deleted popped out or
+[00:15:31] you can say popped out then
+[00:15:33] six would be pumped out six poo powder
+[00:15:36] Shugar fine now say the next top element
+[00:15:39] is for a visa package elegantly from six
+[00:15:43] you would go to which element this four
+[00:15:47] element then backtrack to four fine I am
+[00:15:52] now check this for has any unvisited at
+[00:15:58] the center what takes still HECO is
+[00:16:01] força three to six all are visited nor
+[00:16:06] Texas there then four would be popped
+[00:16:09] out from the Staten F next element is
+[00:16:13] two now we would go to to backtrack to
+[00:16:17] to now find out is there any adjacent
+[00:16:21] vertices of two that is still unvisited
+[00:16:24] yes we have what is that
+[00:16:27] this fine this 5 is still invested and
+[00:16:30] it is adjacent of this too though you
+[00:16:33] would go to this five five would be
+[00:16:36] printed and five would be pushed into
+[00:16:39] the step fine
+[00:16:42] now check five is there any adjacent
+[00:16:46] vertices of five which is still
+[00:16:48] undecided
+[00:16:49] no one already visited two already
+[00:16:52] visited what the next step is we cannot
+[00:16:56] go further from five top of backtrack on
+[00:16:58] a backtrack aha corner first step is
+[00:17:01] five would be popped out from the stack
+[00:17:04] ticket the top element would be popped
+[00:17:06] out now check the next top element that
+[00:17:08] is two then five say backtrack can't be
+[00:17:11] hanging to the two now a is there any
+[00:17:16] animated vortex of two that is adjacent
+[00:17:19] of two and still unvisited
+[00:17:20] no one is there okay then pop out this
+[00:17:24] two now next s 3 so to say backtrack AHA
+[00:17:28] pay only three now check out is there
+[00:17:32] any animated vertex adjacent vertex of
+[00:17:36] three zero two four one all are visited
+[00:17:39] then pop out this three from the stack
+[00:17:43] and next is next top of the steak is
+[00:17:46] one so from three we would go to one
+[00:17:49] Joby's kostik Kotoko gram happy I'm
+[00:17:52] dying it see is there any animals it
+[00:17:54] adjacent what this is a one that is you
+[00:17:57] can push into the stack no all vertices
+[00:17:59] are visited you scared the center though
+[00:18:02] pop out this one from the stack and find
+[00:18:04] out the top that is zero now from one
+[00:18:07] way would go to zero find out zero Kaku
+[00:18:13] here descent water says that is still
+[00:18:15] done visited no then pop out the zero
+[00:18:17] from the step now see stack is empty so
+[00:18:21] this is the indication where you have to
+[00:18:23] stop this
+[00:18:24] BFS algorithm fine and this is the DFS
+[00:18:29] traversal of our graph now in this case
+[00:18:34] also this is the only you know this is
+[00:18:36] not the only DFS traversal
+[00:18:38] there are numerous value to DFS
+[00:18:41] traversal of this graph how you can find
+[00:18:43] out C suppose you are starting from zero
+[00:18:46] Hermia has a zero say start Karangahape
+[00:18:48] le to one but from zero you can go to
+[00:18:53] this vertex 3 also take a whiskey by the
+[00:18:57] visit karoge so this would be another
+[00:19:00] DFS traversal fine so I say brought
+[00:19:04] sorry is my DFS traversal okay Oh such a
+[00:19:07] the BFS many up go but are they a BFS
+[00:19:09] make alga all try to explore all the
+[00:19:13] nodes as close as possible to the root
+[00:19:18] node means level order is scared yes and
+[00:19:21] it may be homie paleo sorry explored me
+[00:19:24] after that you will go further fine
+[00:19:28] but DFS make alga any one node would be
+[00:19:33] visited from that root node loose Chabad
+[00:19:36] whose notes a further up visit kirovsk
+[00:19:39] about further further and further you
+[00:19:40] will go deeper and when you will reach
+[00:19:43] that dead end
+[00:19:44] Jos a aapko you know you don't have any
+[00:19:47] unbudgeted adjacent vertices then you
+[00:19:49] would backtrack or backtrack a poke a
+[00:19:51] sabotage it occur from this stuck
+[00:19:54] they say I'm dead end pay poncho V that
+[00:19:56] top of the stack would be popped out
+[00:19:59] fine
+[00:20:00] next dope I got perhaps emo happen
+[00:20:02] school backtrack appear google fine
+[00:20:07] so this is the DFS traversal DFS one
+[00:20:10] another difference is the DFS may up
+[00:20:12] coke out the stack data structure user
+[00:20:14] go DFS sorry BFS macaca kyu-ho call TFS
+[00:20:18] Makabe Stanley the structure won't be
+[00:20:20] used ok then bye see you in the next
+[00:20:24] video
