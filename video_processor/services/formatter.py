@@ -45,3 +45,35 @@ remainder = 17 % 5   # 2
 but divmod() gives you both values in one call, making the code shorter and cleaner.
 
 '''
+
+def transcript_to_timestamped(transcript):
+
+    lines = []
+
+    for segment in transcript.segments:
+        lines.append(f"[{format_timestamp(segment.start)}] {segment.txt}")
+
+    return "\n".join(lines)
+
+'''
+The function returns a single string where each transcript segment is on its own line, prefixed with a formatted timestamp.
+
+For example, if:
+
+transcript.segments = [
+    Segment(start=0.0, text="Hello everyone."),
+    Segment(start=5.3, text="Welcome to today's meeting."),
+    Segment(start=12.8, text="Let's get started.")
+]
+
+and format_timestamp() returns timestamps like 00:00, 00:05, and 00:12, then the output would be:
+
+[00:00] Hello everyone.
+[00:05] Welcome to today's meeting.
+[00:12] Let's get started.
+
+'''
+
+def transcript_to_text(transcript):
+
+    return transcript.txt
