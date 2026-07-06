@@ -12,19 +12,20 @@ class SQLiteStorage:
             video_id TEXT PRIMARY KEY,
             title TEXT,
             language TEXT,
+            langauge_code TEXT,
             transcript TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
-    def save(self, video_id, title, language, transcript):
+    def save(self, video_id, title, language, language_code, transcript):
         self.conn.execute(
             """
             INSERT OR REPLACE INTO transcripts
-            (video_id, title, language, transcript)
-            VALUES (?, ?, ?, ?)
+            (video_id, title, language, language_code, transcript)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (video_id, title, language, transcript),
+            (video_id, title, language, language_code, transcript),
         )
 
         self.conn.commit()
@@ -32,14 +33,24 @@ class SQLiteStorage:
     def get(self, video_id):
 
         cursor = self.conn.execute(
-            "SELECT transcript FROM transcripts WHERE video_id=?",
+            """
+            SELECT video_id, title, language, transcript
+            FROM transcripts
+            WHERE video_id=?
+            """,
             (video_id,),
         )
 
         row = cursor.fetchone()
 
         if row:
-            return row[0]
+            return {
+                "video_id": row[0],
+                "title": row[1],
+                "language": row[2],
+                "language_code": row[3],
+                "transcript": row[4],
+            }
 
         return None
 
