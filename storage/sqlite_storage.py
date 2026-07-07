@@ -1,42 +1,37 @@
 import sqlite3
 
-
 class SQLiteStorage:
 
     def __init__(self):
-
         self.conn = sqlite3.connect("transcripts.db")
 
         self.conn.execute("""
         CREATE TABLE IF NOT EXISTS transcripts (
             video_id TEXT PRIMARY KEY,
-            title TEXT,
             language TEXT,
-            langauge_code TEXT,
-            transcript TEXT,
+            language_code TEXT,
+            segments TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """)
 
-    def save(self, video_id, title, language, language_code, transcript):
+    def save(self, video_id, language, language_code, segments):
         self.conn.execute(
             """
             INSERT OR REPLACE INTO transcripts
-            (video_id, title, language, language_code, transcript)
-            VALUES (?, ?, ?, ?, ?)
+            (video_id, language, language_code, segments)
+            VALUES (?, ?, ?, ?)
             """,
-            (video_id, title, language, language_code, transcript),
+            (video_id, language, language_code, segments),
         )
-
         self.conn.commit()
 
     def get(self, video_id):
-
         cursor = self.conn.execute(
             """
-            SELECT video_id, title, language, transcript
+            SELECT video_id, language, language_code, segments
             FROM transcripts
-            WHERE video_id=?
+            WHERE video_id = ?
             """,
             (video_id,),
         )
@@ -46,13 +41,15 @@ class SQLiteStorage:
         if row:
             return {
                 "video_id": row[0],
-                "title": row[1],
-                "language": row[2],
-                "language_code": row[3],
-                "transcript": row[4],
+                "language": row[1],
+                "language_code": row[2],
+                "segments": row[3],
             }
 
         return None
+    
+    def close(self) -> None: 
+        self.conn.close()
 
 '''
 
@@ -65,10 +62,30 @@ if __name__ == "__main__":
         "[00:00:00] Hello\n[00:00:01] Welcome to the video."
     )
 
-    transcript = storage.get("abc123")
+    segments = storage.get("abc123")
 
-    print(transcript)
+    print(segments)
 
 Output :
+
+-----------------
+
+storage = SQLiteStorage()
+
+storage.save(
+    video_id=segments.video_id,
+    title=title,
+    language=segments.language,
+    language_code=segments.language_code,
+    segments=segments.text,
+)
+
+data = storage.get(segments.video_id)
+
+if data:
+    print(data["title"])
+    print(data["segments"])
+
+storage.close()
 
 '''

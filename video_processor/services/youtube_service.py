@@ -51,7 +51,8 @@ class YoutubeTranscriptService:
         return Transcript(language_code = transcript.language_code,
                           video_id = transcript.video_id,
                           language = transcript.language,
-                          segments = segments)
+                          segments = segments
+                          )
 
     
 '''
