@@ -22,3 +22,6 @@ cache/
 build/
 dist/
 *.egg-info/
+
+#sqlite_database
+transcripts.db
