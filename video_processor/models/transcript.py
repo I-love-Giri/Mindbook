@@ -45,8 +45,7 @@ class Transcript:
     video_id: str
     language_code: str
     language: str
-    segments: list[Segment]
-
+    segments: list[Segment] 
     @property
     def text(self)->str:
         return  " ".join(segment.text for segment in self.segments)

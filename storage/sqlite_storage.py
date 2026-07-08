@@ -1,32 +1,56 @@
+import json
 import sqlite3
 
+from video_processor.models.transcript import Segment, Transcript
+
 class SQLiteStorage:
+    def __init__(self, db_path: str = "transcripts.db"):
+        self.conn = sqlite3.connect(db_path)
+        self.conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS transcripts (
+                video_id TEXT PRIMARY KEY,
+                language TEXT,
+                language_code TEXT,
+                segments TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+            """
+        )
+        self.conn.commit()
 
-    def __init__(self):
-        self.conn = sqlite3.connect("transcripts.db")
+    def save(self, transcript: Transcript) -> None:
+        """Persist a full Transcript, including per-segment timing, as JSON."""
 
-        self.conn.execute("""
-        CREATE TABLE IF NOT EXISTS transcripts (
-            video_id TEXT PRIMARY KEY,
-            language TEXT,
-            language_code TEXT,
-            segments TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
-        """)
+        segments_json = json.dumps(
+            [
+                {
+                    "text": seg.text,
+                    "start": seg.start,
+                    "duration": seg.duration,
+                }
+                for seg in transcript.segments
+            ]
+        )
 
-    def save(self, video_id, language, language_code, segments):
         self.conn.execute(
             """
             INSERT OR REPLACE INTO transcripts
             (video_id, language, language_code, segments)
             VALUES (?, ?, ?, ?)
             """,
-            (video_id, language, language_code, segments),
+            (
+                transcript.video_id,
+                transcript.language,
+                transcript.language_code,
+                segments_json,
+            ),
         )
         self.conn.commit()
 
-    def get(self, video_id):
+    def get(self, video_id: str):
+        """Return a fully reconstructed Transcript object, or None."""
+
         cursor = self.conn.execute(
             """
             SELECT video_id, language, language_code, segments
@@ -35,57 +59,30 @@ class SQLiteStorage:
             """,
             (video_id,),
         )
-
         row = cursor.fetchone()
 
-        if row:
-            return {
-                "video_id": row[0],
-                "language": row[1],
-                "language_code": row[2],
-                "segments": row[3],
-            }
+        if row is None:
+            return None
 
-        return None
-    
-    def close(self) -> None: 
+        video_id, language, language_code, segments_json = row
+
+        raw_segments = json.loads(segments_json)
+        
+        segments = [
+            Segment(
+                text=s["text"],
+                start=s["start"],
+                duration=s["duration"],
+            )
+            for s in raw_segments
+        ]
+
+        return Transcript(
+            video_id=video_id,
+            language=language,
+            language_code=language_code,
+            segments=segments,
+        )
+
+    def close(self) -> None:
         self.conn.close()
-
-'''
-
-if __name__ == "__main__":
-
-    storage = SQLiteStorage()
-
-    storage.save(
-        "abc123",
-        "[00:00:00] Hello\n[00:00:01] Welcome to the video."
-    )
-
-    segments = storage.get("abc123")
-
-    print(segments)
-
-Output :
-
------------------
-
-storage = SQLiteStorage()
-
-storage.save(
-    video_id=segments.video_id,
-    title=title,
-    language=segments.language,
-    language_code=segments.language_code,
-    segments=segments.text,
-)
-
-data = storage.get(segments.video_id)
-
-if data:
-    print(data["title"])
-    print(data["segments"])
-
-storage.close()
-
-'''
