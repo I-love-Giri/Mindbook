@@ -1,4 +1,5 @@
 from cache.memory_cache import MemoryCache
+from processing.services.cleaner import TranscriptCleaner
 from storage.sqlite_storage import SQLiteStorage
 from video_processor.services.youtube_service import YoutubeTranscriptService
 
@@ -7,6 +8,12 @@ class TranscriptService:
     def __init__(self, db=None):
         self.cache = MemoryCache()
         self.db = db or SQLiteStorage()
+    
+    def clean_transcript(self, transcript):
+        for segment in transcript.segments:
+            segment.text = TranscriptCleaner.clean(segment.text)
+
+        return transcript
 
     def get(self, video_id):
 
@@ -31,6 +38,9 @@ class TranscriptService:
 
         if transcript is None:
             return None
+        
+        # Clean transcript text
+        transcript = self.clean_transcript(transcript)
 
         # 4. Save to database (full Transcript object, incl. segments)
         self.db.save(transcript)
