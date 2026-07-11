@@ -31,3 +31,13 @@ def test_full_transcript_cleanup():
     expected = 'Hello world! This is a test. "Clean transcripts"'
 
     assert TranscriptCleaner.clean(raw) == expected
+
+
+'''
+A lesson from these tests
+
+The first test caught a formatting bug ("" vs " " in join).
+The second test caught an edge case (empty input).
+The third test exposed a logic bug (adding an empty chunk before the first sentence).
+
+'''

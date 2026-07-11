@@ -25,3 +25,6 @@ dist/
 
 #sqlite_database
 transcripts.db
+
+#environment variables
+.env

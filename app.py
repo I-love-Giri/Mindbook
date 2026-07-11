@@ -11,4 +11,3 @@ t_service = TranscriptService()
 transcript = t_service.get(video_id)
 
 print(transcript.text)
-
