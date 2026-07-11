@@ -1,3 +1,9 @@
+'''
+For most RAG applications (chatbots over PDFs, transcripts, documentation), the sentence-aware token chunker is usually the better choice because it preserves natural language structure while still respecting token limits. The raw token approach is useful when you need strict control over chunk size.
+
+'''
+
+
 import re
 from typing import List
 
