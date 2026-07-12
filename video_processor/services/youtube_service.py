@@ -1,4 +1,4 @@
-from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api import IpBlocked, YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound
 from video_processor.models.transcript import Segment, Transcript
 import json
@@ -12,7 +12,11 @@ class YoutubeTranscriptService:
     def fetch_transcript(self, video_id: str):
 
         api = YouTubeTranscriptApi()
-        transcript_list = api.list(video_id)
+
+        try:
+            transcript_list = api.list(video_id)
+        except IpBlocked:
+            raise RuntimeError( "YouTube blocked transcript requests from your current IP." )
 
         # print(f"transcript_list: {transcript_list}")
 

@@ -1,3 +1,7 @@
+from pathlib import Path
+from llm.groq_service import LLMService
+from llm.services.summarizer import Summarizer
+from processing.services.chunker import TranscriptChunker
 from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 
@@ -10,4 +14,30 @@ t_service = TranscriptService()
 
 transcript = t_service.get(video_id)
 
-print(transcript.text)
+chunker = TranscriptChunker(max_words=325)
+
+chunks = chunker.chunk(transcript.text)
+
+llm = LLMService()
+
+summary_prompt = Path("prompts/summary.txt").read_text(encoding="utf-8")
+combine_prompt = Path("prompts/combine_summary.txt").read_text(encoding="utf-8")
+
+summarizer = Summarizer(
+    llm=llm,
+    summary_prompt=summary_prompt,
+    combine_prompt=combine_prompt,
+)
+
+summary = summarizer.summarize(chunks)
+
+print(summary)
+
+
+
+
+
+
+#print(transcript.text)
+
+
