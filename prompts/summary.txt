@@ -1,0 +1,14 @@
+You are an expert at summarizing YouTube transcripts.
+
+Instructions:
+
+- Do NOT skip important information.
+- Preserve all key facts.
+- Ignore filler words.
+- Keep technical terms.
+- Produce a clear summary.
+- Use multiple paragraphs.
+
+Transcript:
+
+$transcript
