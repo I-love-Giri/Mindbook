@@ -1,11 +1,14 @@
 import json
 import sqlite3
 
+from storage.base_storage import BaseStorage
 from video_processor.models.transcript import Segment, Transcript
 
-class SQLiteStorage:
+
+class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str = "transcripts.db"):
         self.conn = sqlite3.connect(db_path)
+
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS transcripts (
@@ -17,19 +20,18 @@ class SQLiteStorage:
             );
             """
         )
+
         self.conn.commit()
 
     def save(self, transcript: Transcript) -> None:
-        """Persist a full Transcript, including per-segment timing, as JSON."""
-
         segments_json = json.dumps(
             [
                 {
-                    "text": seg.text,
-                    "start": seg.start,
-                    "duration": seg.duration,
+                    "text": segment.text,
+                    "start": segment.start,
+                    "duration": segment.duration,
                 }
-                for seg in transcript.segments
+                for segment in transcript.segments
             ]
         )
 
@@ -46,11 +48,10 @@ class SQLiteStorage:
                 segments_json,
             ),
         )
+
         self.conn.commit()
 
     def get(self, video_id: str):
-        """Return a fully reconstructed Transcript object, or None."""
-
         cursor = self.conn.execute(
             """
             SELECT video_id, language, language_code, segments
@@ -59,6 +60,7 @@ class SQLiteStorage:
             """,
             (video_id,),
         )
+
         row = cursor.fetchone()
 
         if row is None:
@@ -67,14 +69,14 @@ class SQLiteStorage:
         video_id, language, language_code, segments_json = row
 
         raw_segments = json.loads(segments_json)
-        
+
         segments = [
             Segment(
-                text=s["text"],
-                start=s["start"],
-                duration=s["duration"],
+                text=segment["text"],
+                start=segment["start"],
+                duration=segment["duration"],
             )
-            for s in raw_segments
+            for segment in raw_segments
         ]
 
         return Transcript(
