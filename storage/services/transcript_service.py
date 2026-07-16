@@ -98,7 +98,8 @@ class TranscriptService:
 
         # 4. Save
         self.db.save(transcript)
-        self.cache.set(video_id, transcript)
+        #self.cache.set(video_id, transcript)
+        self.cache.set(transcript.video_id, transcript)
 
         return transcript
 

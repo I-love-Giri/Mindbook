@@ -3,6 +3,7 @@
 # It only describes what a transcript is
 
 from dataclasses import dataclass
+from typing import Optional
 
 '''
 dataclass:  decorator from Python's dataclasses module.
@@ -46,6 +47,8 @@ class Transcript:
     language_code: str
     language: str
     segments: list[Segment] 
+    summary: Optional[str] = None
+
     @property
     def text(self)->str:
         return  " ".join(segment.text for segment in self.segments)

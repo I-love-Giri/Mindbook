@@ -21,6 +21,7 @@ class MongoStorage(BaseStorage):
             "video_id": transcript.video_id,
             "language": transcript.language,
             "language_code": transcript.language_code,
+            "summary": transcript.summary,
             "segments": [
                 {
                     "text": segment.text,
@@ -57,6 +58,7 @@ class MongoStorage(BaseStorage):
             language=document["language"],
             language_code=document["language_code"],
             segments=segments,
+            summary=document.get("summary")
         )
 
     def close(self) -> None:
