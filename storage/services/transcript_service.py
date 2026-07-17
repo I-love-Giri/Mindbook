@@ -70,6 +70,10 @@ class TranscriptService:
             segment.text = TranscriptCleaner.clean(segment.text)
 
         return transcript
+    
+    def save(self, transcript):
+        self.db.save(transcript)
+        self.cache.set(transcript.video_id, transcript)
 
     def get(self, video_id):
         # 1. Cache
@@ -97,10 +101,10 @@ class TranscriptService:
         transcript = self.clean_transcript(transcript)
 
         # 4. Save
-        self.db.save(transcript)
+        self.save(transcript)
+        
         #self.cache.set(video_id, transcript)
-        self.cache.set(transcript.video_id, transcript)
-
+    
         return transcript
 
     def close(self):
