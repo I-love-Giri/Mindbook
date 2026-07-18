@@ -33,13 +33,10 @@ else:
     )
 
     summary = summarizer.summarize(chunks)
-
     transcript.summary = summary
     t_service.save(transcript)
 
 print(summary)
-
-
 
 
 
