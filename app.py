@@ -1,5 +1,6 @@
 from pathlib import Path
 
+from config.prompts.services.prompt_manager import PromptManager
 from llm.groq_service import LLMService
 from llm.services.summarizer import Summarizer
 from processing.services.chunker import TranscriptChunker
@@ -23,13 +24,18 @@ else:
 
     llm = LLMService()
 
-    summary_prompt = Path("prompts/summary.txt").read_text(encoding="utf-8")
-    combine_prompt = Path("prompts/combine_summary.txt").read_text(encoding="utf-8")
+    #summary_prompt = Path("prompts/summary.txt").read_text(encoding="utf-8")
+    #combine_prompt = Path("prompts/combine_summary.txt").read_text(encoding="utf-8")
+
+    #prompt = PromptManager("prompts")
+
+    prompt = prompt_manager = PromptManager(Path(__file__).parent / "config" / "prompts")
 
     summarizer = Summarizer(
         llm=llm,
-        summary_prompt=summary_prompt,
-        combine_prompt=combine_prompt,
+        prompts= prompt
+        #summary_prompt=summary_prompt,
+        #combine_prompt=combine_prompt,
     )
 
     summary = summarizer.summarize(chunks)
