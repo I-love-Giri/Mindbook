@@ -53,8 +53,10 @@ class Summarizer:
 
 '''
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from string import Template
 import logging
+import time
 from config.prompts.services.prompt_manager import PromptManager
 from llm.groq_service import LLMService
 logger = logging.getLogger(__name__)
@@ -64,14 +66,9 @@ class Summarizer:
     def __init__(
         self,
         llm: LLMService,
-        #summary_prompt: str,
-        #combine_prompt: str,
         prompts: PromptManager
     ):
         self.llm = llm
-        #self.summary_prompt = Template(summary_prompt)
-        #self.combine_prompt = Template(combine_prompt)
-
         self.prompts = prompts
 
         self.summary_prompt = Template(self.prompts.get("summary"))
@@ -88,11 +85,20 @@ class Summarizer:
         )
 
     def summarize_chunk(self, chunk: str) -> str:
+        start = time.perf_counter()
         """
         Generate a summary for a single transcript chunk.
         """
         prompt = self._build_summary_prompt(chunk)
-        return self.llm.generate(prompt).strip()
+        result = self.llm.generate(prompt).strip()
+
+        logger.info(
+            "Chunk processed in %.2f sec",
+            time.perf_counter() - start,
+        )
+
+        return result
+
 
     def combine_summaries(self, summaries: list[str]) -> str:
         """
@@ -100,6 +106,46 @@ class Summarizer:
         """
         prompt = self._build_combine_prompt(summaries)
         return self.llm.generate(prompt).strip()
+    
+    def summarize(self, chunks: list[str]) -> str:
+        """
+        Map-Reduce summarization.
+        """
+
+        logger.info("Starting summarization (%d chunks)", len(chunks))
+
+        partial_summaries = [None] * len(chunks)
+
+        # Map (parallel)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            future_to_index = {}
+
+            for index, chunk in enumerate(chunks):
+                logger.info("Submitting chunk %d/%d", index + 1, len(chunks))
+                future = executor.submit(self.summarize_chunk, chunk)
+                future_to_index[future] = index
+
+            for future in as_completed(future_to_index):
+                index = future_to_index[future]
+
+                try:
+                    partial_summaries[index] = future.result()
+                    logger.info("Completed chunk %d/%d", index + 1, len(chunks))
+                except Exception:
+                    logger.exception("Failed to summarize chunk %d", index + 1)
+                    raise
+
+        logger.info("Combining %d partial summaries", len(partial_summaries))
+
+        # Reduce
+        final_summary = self.combine_summaries(partial_summaries)
+
+        logger.info("Summary generation completed.")
+
+        return final_summary
+
+    
+    '''
 
     def summarize(self, chunks: list[str]) -> str:
         """
@@ -125,3 +171,27 @@ class Summarizer:
         logger.info("Summary generation completed.")
 
         return final_summary
+
+    '''
+
+    ''''
+
+    def summarize(self, chunks: list[str]) -> str:
+        logger.info("Starting summarization (%d chunks)", len(chunks))
+
+        # Map (parallel)
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            partial_summaries = list(
+                executor.map(self.summarize_chunk, chunks)
+            )
+
+        logger.info("Combining %d partial summaries", len(partial_summaries))
+
+        # Reduce
+        final_summary = self.combine_summaries(partial_summaries)
+
+        logger.info("Summary generation completed.")
+
+        return final_summary
+    
+    '''
