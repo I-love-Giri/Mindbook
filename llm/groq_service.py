@@ -1,4 +1,5 @@
 import logging
+import json
 
 from groq import Groq
 
@@ -22,7 +23,7 @@ class LLMService:
         self.client = Groq(
             api_key=GROQ_API_KEY,
             max_retries= 3,  # SDK handles transient retries
-            timeout= 30.0    # Prevent requests from hanging indefinitely
+            timeout= 30.0,    # Prevent requests from hanging indefinitely
         )
 
     '''
@@ -47,6 +48,7 @@ class LLMService:
         prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 1024,
+        json_output: bool = False
     ) -> str:
         logger.info("Sending request to Groq API")
 
@@ -71,7 +73,13 @@ class LLMService:
 
         logger.info("Received response from Groq API")
 
-        return response.choices[0].message.content
+        #return response.choices[0].message.content
+
+        content = response.choices[0].message.content
+        if json_output:
+            return json.loads(content)
+
+        return content
 
 '''
 
