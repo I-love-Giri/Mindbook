@@ -6,6 +6,7 @@ import logging
 import time
 
 from config.prompts.services.prompt_manager import PromptManager
+from config.prompts.services.pyd_model import SubjectClassification
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
@@ -26,6 +27,9 @@ class Summarizer:
 
         self.summary_prompt = Template(self.prompts.get("summary"))
         self.combine_prompt = Template(self.prompts.get("combine_summary"))
+        self.classifier_prompt = Template( self.prompts.get("subject_classifier"))
+                                            
+            
 
     def _build_summary_prompt(self, transcript: str) -> str:
         return self.summary_prompt.substitute(
@@ -43,6 +47,8 @@ class Summarizer:
                 ensure_ascii=False,
             )
         )
+    
+
 
     def _chunk_list(
         self,
@@ -165,6 +171,35 @@ class Summarizer:
             round_number += 1
 
         return summaries[0]
+    
+
+    def _build_classifier_prompt(
+        self,
+        summary: dict[str, Any],
+    ) -> str:
+        return self.classifier_prompt.substitute( 
+            summary=json.dumps(
+            summary.model_dump(),
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+
+    def classify_summary(
+    self,
+    summary: dict[str, Any],
+    ) -> SubjectClassification:
+        prompt = self._build_classifier_prompt(summary)
+
+        response = self.llm.generate(
+            prompt,
+            json_output=True,
+        )
+        return response
+
+
+
+
 
     def summarize(
         self,
@@ -238,6 +273,10 @@ class Summarizer:
             partial_summaries  # type: ignore[arg-type]
         )
 
+        classification = self.classify_summary(
+            final_summary
+        )
+
         logger.info(
             "Combine completed in %.2f sec",
             time.perf_counter() - combine_start,
@@ -248,7 +287,7 @@ class Summarizer:
             time.perf_counter() - pipeline_start,
         )
 
-        return final_summary
+        #return final_summary
 
 
 
