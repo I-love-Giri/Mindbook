@@ -39,10 +39,17 @@ else:
     )
 
     summary = summarizer.summarize(chunks)
+    classification = summarizer.classify_summary(summary)
+
     transcript.summary = summary
-    t_service.save(transcript)
+    transcript.classification = classification  # if your model has this field
+
+    #t_service.save(transcript)
 
 print(summary)
+print(classification)
+
+
 
 
 

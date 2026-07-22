@@ -46,6 +46,49 @@ class LLMService:
     def generate(
         self,
         prompt: str,
+        temperature: float = 0.2,
+        max_tokens: int = 3000,
+        json_output: bool = False,
+    ):
+
+        response = self.client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You are an expert assistant "
+                        "for summarizing YouTube transcripts."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
+            ],
+            temperature=temperature,
+            max_completion_tokens=max_tokens,
+            response_format=(
+                {"type": "json_object"}
+                if json_output
+                else None
+            ),
+        )
+
+        content = response.choices[0].message.content
+
+        if json_output:
+            return json.loads(content)
+
+        return content
+
+
+
+    '''
+
+    def generate(
+        self,
+        prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 1024,
         json_output: bool = False
@@ -80,6 +123,8 @@ class LLMService:
             return json.loads(content)
 
         return content
+
+    '''
 
 '''
 
