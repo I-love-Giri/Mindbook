@@ -47,6 +47,27 @@ else:
     #t_service.save(transcript)
 
 print(summary)
+
+if transcript.classification:
+    print("Classfication :")
+else:
+
+    llm = LLMService()
+
+
+    prompt = prompt_manager = PromptManager(Path(__file__).parent / "config" / "prompts")
+
+
+    summarizer = Summarizer(
+        llm=llm,
+        prompts= prompt
+        #summary_prompt=summary_prompt,
+        #combine_prompt=combine_prompt,
+    )
+
+    classification = summarizer.classify_summary(transcript.summary)
+    transcript.classification = classification
+
 print(classification)
 
 

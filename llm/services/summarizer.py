@@ -179,7 +179,7 @@ class Summarizer:
     ) -> str:
         return self.classifier_prompt.substitute( 
             summary=json.dumps(
-            summary.model_dump(),
+            summary,
             indent=2,
             ensure_ascii=False,
         )
