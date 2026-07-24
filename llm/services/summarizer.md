@@ -342,3 +342,178 @@ That problem still exists.
 ---
 
 ## Parallel Map-Reduce + Hierarchical Reduction (version 3)
+
+Version 3 is where your summarizer becomes scalable. While Version 2 improved speed, Version 3 improves the reduce phase so it can handle very large transcripts without exceeding the LLM's context window.
+
+Instead of combining everything at once,
+
+Version 3 combines summaries in batches.
+
+Suppose, combine_batch_size = 5
+
+and you have 25 summaries
+
+Instead of
+
+25 → 1
+
+Version 3 performs
+
+25 → 5 → 1
+
+Round 1
+Summary 1
+Summary 2
+Summary 3
+Summary 4
+Summary 5
+│
+▼
+Combined Summary A
+
+At the same time
+
+Summary 6
+Summary 7
+Summary 8
+Summary 9
+Summary10
+│
+▼
+Combined Summary B
+
+and so on.
+
+After Round 1
+
+25 summaries
+
+↓
+
+5 summaries
+
+Round 2
+Now combine those five summaries.
+
+Combined A
+Combined B
+Combined C
+Combined D
+Combined E
+
+↓
+
+Final Summary
+
+---
+
+## Why Is This Better?
+
+Instead of sending
+
+500 summaries
+
+to the LLM,
+
+each LLM call only sees
+
+5 summaries
+
+(or whatever batch size you choose).
+
+This keeps every prompt well within the model's limits.
+
+---
+
+## Problems Solved by Version 3
+
+1. Solves Context Window Problems
+
+Version 1 & 2
+100 summaries
+
+↓
+
+One gigantic prompt
+
+Risk:
+
+prompt too large
+model context exceeded
+
+Version 3
+
+100 summaries
+
+↓
+
+20 summaries
+
+↓
+
+4 summaries
+
+↓
+
+1 summary
+
+Every LLM call stays small.
+
+---
+
+2. Scales to Very Large Transcripts
+   Suppose you're summarizing
+
+2-hour meeting ✔
+10-hour meeting ✔
+entire book ✔
+weeks of call transcripts ✔
+Versions 1 and 2 eventually break because the final prompt keeps growing.
+
+Version 3 keeps each combine step bounded by the batch size, so it scales much better.
+
+---
+
+3. Better LLM Performance
+   LLMs generally produce better summaries when given a focused amount of information.
+
+Instead of asking:
+
+"Summarize these 500 summaries."
+
+you ask:
+
+"Summarize these 5 summaries."
+
+The intermediate summaries are then combined, which is often easier for the model to do consistently.
+
+---
+
+4. Parallel Reduction
+   Notice you didn't just make the map phase parallel.
+
+You also made the reduce phase parallel.
+
+This part
+
+with ThreadPoolExecutor(max_workers=self.max_workers)
+
+means multiple batches are combined simultaneously.
+
+Example:
+
+Batch A ─► LLM
+
+Batch B ─► LLM
+
+Batch C ─► LLM
+
+Batch D ─► LLM
+
+All four happen at the same time.
+So Version 3 improves both scalability and performance.
+
+---
+
+5. Memory Usage Is More Predictable
+   You still keep all partial summaries in memory, but each LLM request only needs to process a small batch of summaries rather than one enormous combined prompt. This makes the size of individual requests predictable and independent of the total transcript size.

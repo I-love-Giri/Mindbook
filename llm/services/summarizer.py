@@ -855,182 +855,197 @@ Version 2 still combines all summaries at once:
 
 final_summary = self.combine_summaries(partial_summaries)
 
-If there are
-
-200 summaries
+If there are 200 summaries
 
 the final prompt may become enormous.
 
 That problem still exists.
 
+Possible issues include:
+
+exceeding the model's context window
+API errors
+truncated prompts
+lower-quality summaries because the model has too much information to process at once
+This is the main limitation of Versions 1 and 2.
+
 --------------------------------------------------------------------------------------------
 Parallel Map-Reduce + Hierarchical Reduction (version 3)
 --------------------------------------------------------------------------------------------
 
+Version 3 is where your summarizer becomes scalable. While Version 2 improved speed, Version 3 improves the reduce phase so it can handle very large transcripts without exceeding the LLM's context window.
 
+Instead of combining everything at once,
 
+Version 3 combines summaries in batches.
 
+Suppose, combine_batch_size = 5
 
+and you have 25 summaries
 
+Instead of 
 
+25 → 1
 
+Version 3 performs
 
+25 → 5 → 1
 
+Round 1
+Summary 1
+Summary 2
+Summary 3
+Summary 4
+Summary 5
+        │
+        ▼
+ Combined Summary A
 
+At the same time
 
+Summary 6
+Summary 7
+Summary 8
+Summary 9
+Summary10
+        │
+        ▼
+ Combined Summary B
 
+and so on.
 
-'''
-'''
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from string import Template
-import logging
-import time
-from config.prompts.services.prompt_manager import PromptManager
-from llm.groq_service import LLMService
-logger = logging.getLogger(__name__)
+After Round 1
 
+25 summaries
 
-class Summarizer:
-    def __init__(
-        self,
-        llm: LLMService,
-        prompts: PromptManager
-    ):
-        self.llm = llm
-        self.prompts = prompts
+↓
 
-        self.summary_prompt = Template(self.prompts.get("summary"))
-        self.combine_prompt = Template(self.prompts.get("combine_summary"))
+5 summaries
 
-    def _build_summary_prompt(self, transcript: str) -> str:
-        return self.summary_prompt.substitute(
-            transcript=transcript
-        )
+Round 2
+Now combine those five summaries.
 
-    def _build_combine_prompt(self, summaries: list[str]) -> str:
-        return self.combine_prompt.substitute(
-            summaries="\n\n".join(summaries)
-        )
+Combined A
+Combined B
+Combined C
+Combined D
+Combined E
 
-    def summarize_chunk(self, chunk: str) -> str:
-        start = time.perf_counter()
-        """
-        Generate a summary for a single transcript chunk.
-        """
-        prompt = self._build_summary_prompt(chunk)
-        result = self.llm.generate(prompt).strip()
+↓
 
-        logger.info(
-            "Chunk processed in %.2f sec",
-            time.perf_counter() - start,
-        )
+Final Summary
 
-        return result
+--------------------------------------------------------------------------------------------
+Why Is This Better?
+--------------------------------------------------------------------------------------------
 
+Instead of sending
 
-    
-    def combine_summaries(self, summaries: list[str]) -> str:
-        """
-        Merge partial summaries into one coherent summary.
-        """
-        prompt = self._build_combine_prompt(summaries)
-        return self.llm.generate(prompt).strip()
-    
+500 summaries
 
-    def hierarchical_combine(self, summaries: list[str]) -> str:
-        round_number = 1
+to the LLM,
 
-        while len(summaries) > 1:
+each LLM call only sees
 
-            logger.info(
-                "Combine round %d (%d summaries)",
-                round_number,
-                len(summaries),
-            )
+5 summaries
 
-            batches = list(
-                self._chunk_list(
-                    summaries,
-                    self.combine_batch_size,
-                )
-            )
+(or whatever batch size you choose).
 
-            next_level = [None] * len(batches)
+This keeps every prompt well within the model's limits.
 
-            with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
-                futures = {
-                    executor.submit(self.combine_summaries, batch): idx
-                    for idx, batch in enumerate(batches)
-                }
+--------------------------------------------------------------------------------------------
+Problems Solved by Version 3
+--------------------------------------------------------------------------------------------
 
-                for future in as_completed(futures):
-                    idx = futures[future]
-                    next_level[idx] = future.result()
+1. Solves Context Window Problems
 
-            summaries = next_level
-            round_number += 1
+Version 1 & 2
+100 summaries
 
-        return summaries[0]
+↓
 
-    
-    def summarize(self, chunks: list[str]) -> str:
-        """
-        Map-Reduce summarization.
-        """
+One gigantic prompt
 
-        logger.info("Starting summarization (%d chunks)", len(chunks))
+Risk:
 
-        partial_summaries = [None] * len(chunks)
+prompt too large
+model context exceeded
 
-        # Map (parallel)
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            future_to_index = {}
+Version 3
 
-            for index, chunk in enumerate(chunks):
-                logger.info("Submitting chunk %d/%d", index + 1, len(chunks))
-                future = executor.submit(self.summarize_chunk, chunk)
-                future_to_index[future] = index
+100 summaries
 
-            for future in as_completed(future_to_index):
-                index = future_to_index[future]
+↓
 
-                try:
-                    partial_summaries[index] = future.result()
-                    logger.info("Completed chunk %d/%d", index + 1, len(chunks))
-                except Exception:
-                    logger.exception("Failed to summarize chunk %d", index + 1)
-                    raise
+20 summaries
 
-        logger.info("Combining %d partial summaries", len(partial_summaries))
+↓
 
-        # Reduce
-        final_summary = self.hierarchical_combine(partial_summaries)
+4 summaries
 
-        logger.info("Summary generation completed.")
+↓
 
-        return final_summary
-'''
+1 summary
 
+Every LLM call stays small.
 
-''''
+--------------------------------------------------------------------------------------------
 
-    def summarize(self, chunks: list[str]) -> str:
-        logger.info("Starting summarization (%d chunks)", len(chunks))
+2. Scales to Very Large Transcripts
+Suppose you're summarizing
 
-        # Map (parallel)
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            partial_summaries = list(
-                executor.map(self.summarize_chunk, chunks)
-            )
+2-hour meeting ✔
+10-hour meeting ✔
+entire book ✔
+weeks of call transcripts ✔
+Versions 1 and 2 eventually break because the final prompt keeps growing.
 
-        logger.info("Combining %d partial summaries", len(partial_summaries))
+Version 3 keeps each combine step bounded by the batch size, so it scales much better.
 
-        # Reduce
-        final_summary = self.combine_summaries(partial_summaries)
+--------------------------------------------------------------------------------------------
 
-        logger.info("Summary generation completed.")
+3. Better LLM Performance
+LLMs generally produce better summaries when given a focused amount of information.
 
-        return final_summary
-    
+Instead of asking:
+
+"Summarize these 500 summaries."
+
+you ask:
+
+"Summarize these 5 summaries."
+
+The intermediate summaries are then combined, which is often easier for the model to do consistently.
+
+--------------------------------------------------------------------------------------------
+
+4. Parallel Reduction
+Notice you didn't just make the map phase parallel.
+
+You also made the reduce phase parallel.
+
+This part
+
+with ThreadPoolExecutor(max_workers=self.max_workers)
+
+means multiple batches are combined simultaneously.
+
+Example:
+
+Batch A ─► LLM
+
+Batch B ─► LLM
+
+Batch C ─► LLM
+
+Batch D ─► LLM
+
+All four happen at the same time.
+So Version 3 improves both scalability and performance.
+
+--------------------------------------------------------------------------------------------
+
+5. Memory Usage Is More Predictable
+You still keep all partial summaries in memory, but each LLM request only needs to process a small batch of summaries rather than one enormous combined prompt. This makes the size of individual requests predictable and independent of the total transcript size.
+
 '''
