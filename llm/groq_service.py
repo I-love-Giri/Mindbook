@@ -46,8 +46,8 @@ class LLMService:
     def generate(
         self,
         prompt: str,
-        temperature: float = 0.2,
-        max_tokens: int = 3000,
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
         json_output: bool = False,
     ):
 

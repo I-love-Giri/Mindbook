@@ -1,4 +1,5 @@
 from pathlib import Path
+import streamlit as st
 
 from config.prompts.services.prompt_manager import PromptManager
 from llm.groq_service import LLMService
@@ -8,67 +9,68 @@ from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 
 
-url = input("Enter a YouTube URL: ")
+st.set_page_config(page_title="YouTube Summarizer", layout="wide")
 
-video_id = extract_video_id(url)
+st.title("🎥 YouTube Video Summarizer")
 
-t_service = TranscriptService()
-transcript = t_service.get(video_id)
+url = st.text_input("Enter YouTube URL")
 
-if transcript.summary:
-    print("Summary loaded from DB")
-    summary = transcript.summary
-else:
-    chunker = TranscriptChunker(max_words=325)
-    chunks = chunker.chunk(transcript.text)
+if st.button("Generate Summary"):
 
-    llm = LLMService()
+    if not url:
+        st.warning("Please enter a YouTube URL.")
+        st.stop()
 
-    #summary_prompt = Path("prompts/summary.txt").read_text(encoding="utf-8")
-    #combine_prompt = Path("prompts/combine_summary.txt").read_text(encoding="utf-8")
+    with st.spinner("Loading transcript..."):
 
-    #prompt = PromptManager("prompts")
+        video_id = extract_video_id(url)
 
-    prompt = prompt_manager = PromptManager(Path(__file__).parent / "config" / "prompts")
+        t_service = TranscriptService()
+        transcript = t_service.get(video_id)
 
-    summarizer = Summarizer(
-        llm=llm,
-        prompts= prompt
-        #summary_prompt=summary_prompt,
-        #combine_prompt=combine_prompt,
-    )
+    if transcript.summary:
 
-    summary = summarizer.summarize(chunks)
-    classification = summarizer.classify_summary(summary)
+        summary = transcript.summary
+        classification = transcript.classification
 
-    transcript.summary = summary
-    transcript.classification = classification  # if your model has this field
+        st.success("Loaded summary from database.")
 
-    #t_service.save(transcript)
+    else:
 
-print(summary)
+        with st.spinner("Summarizing video..."):
 
-if transcript.classification:
-    print("Classfication :")
-else:
+            chunker = TranscriptChunker(max_words=325)
+            chunks = chunker.chunk(transcript.text)
 
-    llm = LLMService()
+            llm = LLMService()
 
+            prompt = PromptManager(
+                Path(__file__).parent / "config" / "prompts"
+            )
 
-    prompt = prompt_manager = PromptManager(Path(__file__).parent / "config" / "prompts")
+            summarizer = Summarizer(
+                llm=llm,
+                prompts=prompt,
+            )
 
+            summary = summarizer.summarize(chunks)
+            classification = summarizer.classify_summary(summary)
 
-    summarizer = Summarizer(
-        llm=llm,
-        prompts= prompt
-        #summary_prompt=summary_prompt,
-        #combine_prompt=combine_prompt,
-    )
+            transcript.summary = summary
+            transcript.classification = classification
 
-    classification = summarizer.classify_summary(transcript.summary)
-    transcript.classification = classification
+            # Uncomment if you want to save
+            # t_service.save(transcript)
 
-print(classification)
+    st.subheader("📝 Summary")
+    st.write(summary)
+
+    st.subheader("🏷 Classification")
+    st.success(classification)
+
+    with st.expander("Transcript"):
+        st.write(transcript.text)
+
 
 
 
