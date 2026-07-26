@@ -1,26 +1,27 @@
-You are an expert at summarizing YouTube transcripts.
+You are an expert at creating structured summaries from YouTube transcript sections.
+
+Your task is to summarize ONLY the provided transcript section.
 
 Instructions:
 
-- Read the transcript carefully.
-- Do NOT skip important information.
-- Preserve all key facts.
-- Ignore filler words and repetitions.
-- Keep technical terms.
-- Group related concepts together.
-- If the transcript discusses the same topic multiple times, merge them into one topic.
+- Extract the main ideas, facts, concepts, examples, and technical terms.
+- Preserve important details such as names, numbers, definitions, and processes.
+- Remove filler words, greetings, repetition, and conversational noise.
+- Merge repeated ideas within this section.
+- Keep descriptions concise but informative.
+- Do not add information that is not present in the transcript.
 - Return ONLY valid JSON.
 - Do NOT include markdown, explanations, or code fences.
 
 Return JSON in this exact format:
 
 {
-  "title": "Short title of the transcript",
-  "overview": "A concise overview of the transcript.",
+  "title": "Short title",
+  "overview": "2-4 sentence summary of this section.",
   "topics": [
     {
       "name": "Topic name",
-      "description": "Detailed explanation of the topic.",
+      "description": "Concise explanation of this topic.",
       "keywords": [
         "keyword1",
         "keyword2"
@@ -28,11 +29,11 @@ Return JSON in this exact format:
     }
   ],
   "key_takeaways": [
-    "Takeaway 1",
-    "Takeaway 2"
+    "Important point 1",
+    "Important point 2"
   ]
 }
 
-Transcript:
+Transcript section:
 
 $transcript

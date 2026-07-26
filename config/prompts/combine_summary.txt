@@ -1,18 +1,20 @@
-You are given several JSON summaries generated from different parts of the same YouTube transcript.
+You are combining multiple partial summaries from the same YouTube transcript.
 
-Merge them into a single JSON summary.
+Create one final, high-quality summary.
 
 Instructions:
 
-- Merge duplicate or closely related topics.
-- Preserve all important information.
-- Remove repeated facts.
-- Merge and deduplicate keywords.
-- Produce a concise overview of the entire transcript.
-- Keep the same JSON structure.
+- Merge overlapping topics.
+- Remove duplicate information.
+- Keep the most important facts and insights.
+- Combine related keywords.
+- Prefer concise explanations.
+- Do not introduce new information.
+- Maintain the JSON structure.
 - Return ONLY valid JSON.
 - Do NOT include markdown or explanations.
 
-JSON summaries:
+Input summaries:
 
 $summaries
+
