@@ -1,9 +1,9 @@
 import logging
 import json
 
-from groq import Groq
+from groq import APIConnectionError, APITimeoutError, Groq, RateLimitError
 
-'''
+
 from tenacity import (
     before_sleep_log,
     retry,
@@ -11,7 +11,7 @@ from tenacity import (
     stop_after_attempt,
     wait_random_exponential,
 )
-'''
+
 
 from config.settings import GROQ_API_KEY, MODEL_NAME
 
@@ -22,11 +22,11 @@ class LLMService:
     def __init__(self):
         self.client = Groq(
             api_key=GROQ_API_KEY,
-            max_retries= 3,  # SDK handles transient retries
+            #max_retries= 3,  # SDK handles transient retries
             timeout= 30.0,    # Prevent requests from hanging indefinitely
         )
 
-    '''
+    
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_random_exponential(multiplier=1, max=10),
@@ -41,7 +41,7 @@ class LLMService:
         reraise=True,
     )
     
-    '''
+    
 
     def generate(
         self,
