@@ -17,8 +17,8 @@ class Summarizer:
         self,
         llm: LLMService,
         prompts: PromptManager,
-        max_workers: int = 3,
-        combine_batch_size: int = 2,
+        max_workers: int = 1,
+        combine_batch_size: int = 5,
     ):
         self.llm = llm
         self.prompts = prompts
