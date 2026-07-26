@@ -60,7 +60,7 @@ if st.button("Generate Summary"):
             transcript.classification = classification
 
             # Uncomment if you want to save
-            # t_service.save(transcript)
+            t_service.save(transcript)
 
     st.subheader("📝 Summary")
     st.write(summary)
