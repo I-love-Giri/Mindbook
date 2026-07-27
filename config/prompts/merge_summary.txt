@@ -1,0 +1,15 @@
+You are given multiple structured summaries of consecutive transcript sections.
+
+Your task is to merge them into ONE coherent summary.
+
+Rules:
+
+- Preserve all important information.
+- Remove duplicate topics.
+- Merge similar topics together.
+- Keep chronological order.
+- Produce a single JSON using exactly the same schema.
+
+Summaries:
+
+$summaries
