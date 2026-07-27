@@ -1,7 +1,6 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import json
 from string import Template
 from typing import Any
-import json
 import logging
 import time
 
@@ -17,47 +16,30 @@ class Summarizer:
         self,
         llm: LLMService,
         prompts: PromptManager,
-        max_workers: int = 1,
-        combine_batch_size: int = 5,
     ):
         self.llm = llm
         self.prompts = prompts
-        self.max_workers = max_workers
-        self.combine_batch_size = combine_batch_size
 
-        self.summary_prompt = Template(self.prompts.get("summary"))
-        self.combine_prompt = Template(self.prompts.get("combine_summary"))
-        self.classifier_prompt = Template( self.prompts.get("subject_classifier"))
-                                            
-            
+        self.summary_prompt = Template(
+            self.prompts.get("summary")
+        )
 
-    def _build_summary_prompt(self, transcript: str) -> str:
+        self.classifier_prompt = Template(
+            self.prompts.get("subject_classifier")
+        )
+
+        self.merge_prompt = Template(
+            self.prompts.get("merge_summary")
+        )
+
+
+    def _build_summary_prompt(
+        self,
+        transcript: str,
+    ) -> str:
         return self.summary_prompt.substitute(
             transcript=transcript
         )
-
-    def _build_combine_prompt(
-        self,
-        summaries: list[dict[str, Any]],
-    ) -> str:
-        return self.combine_prompt.substitute(
-            summaries=json.dumps(
-                summaries,
-                indent=2,
-                ensure_ascii=False,
-            )
-        )
-    
-
-
-    def _chunk_list(
-        self,
-        items: list[Any],
-        size: int,
-    ):
-        """Yield successive batches from a list."""
-        for i in range(0, len(items), size):
-            yield items[i:i + size]
 
     def summarize_chunk(
         self,
@@ -66,6 +48,7 @@ class Summarizer:
         """
         Generate a structured summary for a single transcript chunk.
         """
+
         start = time.perf_counter()
 
         prompt = self._build_summary_prompt(chunk)
@@ -82,112 +65,21 @@ class Summarizer:
 
         return summary
 
-    def combine_summaries(
-        self,
-        summaries: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        """
-        Combine a batch of JSON summaries into one JSON summary.
-        """
-        prompt = self._build_combine_prompt(summaries)
-
-        return self.llm.generate(
-            prompt,
-            json_output=True,
-        )
-
-    def hierarchical_combine(
-        self,
-        summaries: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        """
-        Hierarchically combine summaries until only one remains.
-        """
-
-        if not summaries:
-            return {
-                "title": "",
-                "overview": "",
-                "topics": [],
-                "key_takeaways": [],
-            }
-
-        if len(summaries) <= self.combine_batch_size:
-            return self.combine_summaries(summaries)
-
-        round_number = 1
-
-        while len(summaries) > 1:
-
-            logger.info(
-                "Combine round %d (%d summaries)",
-                round_number,
-                len(summaries),
-            )
-
-            batches = list(
-                self._chunk_list(
-                    summaries,
-                    self.combine_batch_size,
-                )
-            )
-
-            next_level = [None] * len(batches)
-
-            with ThreadPoolExecutor(
-                max_workers=self.max_workers
-            ) as executor:
-
-                future_to_index = {
-                    executor.submit(
-                        self.combine_summaries,
-                        batch,
-                    ): idx
-                    for idx, batch in enumerate(batches)
-                }
-
-                for future in as_completed(future_to_index):
-
-                    idx = future_to_index[future]
-
-                    try:
-                        next_level[idx] = future.result()
-
-                        logger.info(
-                            "Completed combine batch %d/%d",
-                            idx + 1,
-                            len(batches),
-                        )
-
-                    except Exception:
-                        logger.exception(
-                            "Failed combine round %d batch %d",
-                            round_number,
-                            idx + 1,
-                        )
-                        raise
-
-            summaries = next_level
-            round_number += 1
-
-        return summaries[0]
-    
-
     def _build_classifier_prompt(
         self,
         summary: dict[str, Any],
     ) -> str:
-        return self.classifier_prompt.substitute( 
+        return self.classifier_prompt.substitute(
             summary=json.dumps(
-            summary,
-            indent=2,
-            ensure_ascii=False,
+                summary,
+                indent=2,
+                ensure_ascii=False,
+            )
         )
-    )
 
     def classify_summary(
-    self,
-    summary: dict[str, Any],
+        self,
+        summary: dict[str, Any],
     ) -> SubjectClassification:
         prompt = self._build_classifier_prompt(summary)
 
@@ -195,95 +87,151 @@ class Summarizer:
             prompt,
             json_output=True,
         )
+
         return response
+    
+    def _build_merge_prompt(
+        self,
+        summaries: list[dict[str, Any]],
+    ) -> str:
+        return self.merge_prompt.substitute(
+            summaries=json.dumps(
+                summaries,
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+    
+    def merge_summaries(
+    self,
+    summaries: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """
+        Merge several structured summaries into one.
+        """
+
+        prompt = self._build_merge_prompt(
+            summaries
+        )
+
+        return self.llm.generate(
+            prompt,
+            json_output=True,
+        )
+    
+    def hierarchical_merge(
+    self,
+    summaries: list[dict[str, Any]],
+    batch_size: int = 5,
+    ) -> dict[str, Any]:
+        """
+        Merge summaries in batches until only one remains.
+        """
+
+        level = summaries
+
+        round_num = 1
+
+        while len(level) > 1:
+
+            logger.info(
+                "Merge round %d (%d summaries)",
+                round_num,
+                len(level),
+            )
+
+            next_level = []
+
+            for i in range(
+                0,
+                len(level),
+                batch_size,
+            ):
+
+                batch = level[
+                    i:i + batch_size
+                ]
+
+                merged = self.merge_summaries(
+                    batch
+                )
+
+                next_level.append(
+                    merged
+                )
+
+            level = next_level
+
+            round_num += 1
+
+        return level[0]
+
+
 
 
     def summarize(
         self,
         chunks: list[str],
-    ) -> dict[str, Any]:
+    ) -> list[dict[str, Any]]:
         """
-        Map-Reduce summarization with hierarchical reduction.
+        Sequential summarization.
+        No threading.
+        No batching.
+        No combining.
         """
 
         if not chunks:
-            logger.warning("No transcript chunks received.")
+            logger.warning(
+                "No transcript chunks received."
+            )
 
-            return {
-                "title": "",
-                "overview": "",
-                "topics": [],
-                "key_takeaways": [],
-            }
+            return []
 
         pipeline_start = time.perf_counter()
 
         logger.info(
-            "Starting summarization (%d chunks)",
+            "Starting sequential summarization (%d chunks)",
             len(chunks),
         )
 
-        partial_summaries: list[dict[str, Any] | None] = [None] * len(chunks)
+        summaries = []
 
-        # ---------------- MAP ----------------
+        for idx, chunk in enumerate(chunks):
 
-        with ThreadPoolExecutor(
-            max_workers=self.max_workers
-        ) as executor:
+            try:
+                summary = self.summarize_chunk(chunk)
 
-            future_to_index = {
-                executor.submit(
-                    self.summarize_chunk,
-                    chunk,
-                ): idx
-                for idx, chunk in enumerate(chunks)
-            }
+                summaries.append(summary)
 
-            for future in as_completed(future_to_index):
+                logger.info(
+                    "Completed chunk %d/%d",
+                    idx + 1,
+                    len(chunks),
+                )
 
-                idx = future_to_index[future]
-
-                try:
-                    partial_summaries[idx] = future.result()
-
-                    logger.info(
-                        "Completed chunk %d/%d",
-                        idx + 1,
-                        len(chunks),
-                    )
-
-                except Exception:
-                    logger.exception(
-                        "Failed to summarize chunk %d",
-                        idx + 1,
-                    )
-                    raise
+            except Exception:
+                logger.exception(
+                    "Failed to summarize chunk %d",
+                    idx + 1,
+                )
+                raise
 
         logger.info(
-            "Starting hierarchical combine (%d summaries)",
-            len(partial_summaries),
+            "Total summarization completed in %.2f sec",
+            time.perf_counter() - pipeline_start,
         )
 
-        combine_start = time.perf_counter()
-
-        final_summary = self.hierarchical_combine(
-            partial_summaries  # type: ignore[arg-type]
-        )
-
-        classification = self.classify_summary(
-            final_summary
-        )
-
-
-        logger.info(
-            "Combine completed in %.2f sec",
-            time.perf_counter() - combine_start,
+        final_summary = self.hierarchical_merge(
+            summaries,
+            batch_size=5,
         )
 
         logger.info(
             "Total summarization completed in %.2f sec",
             time.perf_counter() - pipeline_start,
         )
+
+        return final_summary
 
         #return final_summary
 
