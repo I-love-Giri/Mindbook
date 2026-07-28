@@ -39,8 +39,8 @@ if st.button("Generate Summary"):
 
         with st.spinner("Summarizing video..."):
 
-            chunker = TranscriptChunker(max_words=325)
-            chunks = chunker.chunk(transcript.text)
+            chunker = TranscriptChunker(max_words=500)
+            chunks = chunker.chunk(transcript.segments,transcript.video_id)
 
             llm = LLMService()
 
