@@ -517,3 +517,817 @@ So Version 3 improves both scalability and performance.
 
 5. Memory Usage Is More Predictable
    You still keep all partial summaries in memory, but each LLM request only needs to process a small batch of summaries rather than one enormous combined prompt. This makes the size of individual requests predictable and independent of the total transcript size.
+
+# Problems :
+
+That error usually means the tool or model you are using was expected to return valid JSON, but it couldn't produce output that matched the required JSON format.
+
+Depending on the context, it can mean different things:
+
+1. The prompt is too vague or conflicting (most common)
+   If you're asking an AI to return JSON, but your prompt also asks for explanations or markdown.
+
+2. The generated JSON doesn't match the required schema
+   Suppose the application expects:
+
+{
+"name": "string",
+"age": "number"
+}
+
+But the model returns:
+
+{
+"name": "Alice",
+"age": "twenty-five"
+}
+
+3. The JSON itself is malformed
+   For example:
+
+{
+"name": "Alice",
+"age": 25,
+}
+
+Notice the trailing comma.
+
+Or:
+
+{
+name: "Alice"
+}
+
+Keys must be quoted.
+
+4. The model exceeded limits or got confused
+   If your prompt is very long or asks for many things at once, the model may output incomplete JSON like:
+
+{
+"users": [
+{
+"name": "Alice"
+
+The JSON is incomplete, so parsing fails.
+
+5. Your application is enforcing structured output
+   If you're using APIs with features like:
+
+JSON mode
+Structured Outputs
+Function Calling
+Response schemas
+then the model must produce JSON matching a specific schema. Any mismatch triggers an error such as:
+
+Failed to generate JSON. Please adjust your prompt.
+
+---
+
+This code implements a complete LLM summarization pipeline.
+
+Instead of sending one huge transcript to the LLM (which may exceed token limits), it:
+
+Splits the transcript into chunks.
+Summarizes each chunk individually.
+Merges the summaries together.
+Repeats merging until only one final summary remains.
+Can also classify the final summary into a subject/category.
+
+Think of it like summarizing a book:
+
+Book
+│
+├── Chapter 1 → Summary
+├── Chapter 2 → Summary
+├── Chapter 3 → Summary
+├── Chapter 4 → Summary
+└── Chapter 5 → Summary
+│
+▼
+Merge summaries
+│
+▼
+Final Book Summary
+
+Let's go through every part.
+
+Imports
+import json
+
+Used for converting Python dictionaries/lists into JSON strings.
+
+Example:
+
+data = {
+"title": "Python",
+"duration": 20
+}
+
+json.dumps(data)
+
+Output
+
+'{"title": "Python", "duration": 20}'
+
+The LLM prompt needs JSON text instead of Python objects.
+
+from string import Template
+
+Template lets you create prompt templates with placeholders.
+
+Example
+
+from string import Template
+
+prompt = Template("Summarize this:\n$transcript")
+
+prompt.substitute(
+transcript="Python is easy."
+)
+
+Output
+
+Summarize this:
+Python is easy.
+
+Instead of manually concatenating strings, placeholders are replaced automatically.
+
+from typing import Any
+
+Used only for type hints.
+
+Example
+
+dict[str, Any]
+
+means
+
+dictionary
+keys = strings
+values = anything
+
+Example
+
+{
+"title":"Python",
+"score":95,
+"topics":["Variables","Loops"]
+}
+
+All value types are allowed.
+
+import logging
+
+Used to print logs.
+
+Example
+
+logger.info("Started")
+
+Output
+
+INFO Started
+
+Useful for debugging.
+
+import time
+
+Used to measure execution time.
+
+Example
+
+start = time.perf_counter()
+
+# some work
+
+print(time.perf_counter() - start)
+
+Output
+
+0.53 seconds
+
+from config.prompts.services.prompt_manager import PromptManager
+
+Loads prompt templates.
+
+Instead of writing
+
+Summarize the following transcript...
+
+inside Python code, prompts are stored separately.
+
+Example
+
+summary.txt
+
+Summarize this:
+
+$transcript
+
+Then
+
+prompts.get("summary")
+
+returns that text.
+
+from config.prompts.services.pyd_model import SubjectClassification
+
+Probably a Pydantic model.
+
+Example
+
+class SubjectClassification(BaseModel):
+
+    subject: str
+
+    confidence: float
+
+LLM output
+
+{
+"subject":"Python",
+"confidence":0.94
+}
+
+gets converted into this model.
+
+from llm.groq_service import LLMService
+
+This is your wrapper around Groq.
+
+Instead of
+
+client.chat.completions.create(...)
+
+you call
+
+self.llm.generate(...)
+
+Much cleaner.
+
+Logger
+logger = logging.getLogger(**name**)
+
+Creates a logger for this file.
+
+Summarizer Class
+class Summarizer:
+
+This class manages the entire summarization pipeline.
+
+Constructor
+def **init**(...)
+
+Receives
+
+llm
+
+Example
+
+Groq
+OpenAI
+Claude
+Gemini
+
+and
+
+prompts
+
+which contains prompt templates.
+
+It stores them
+
+self.llm = llm
+self.prompts = prompts
+
+Then loads templates.
+
+self.summary_prompt = Template(
+self.prompts.get("summary")
+)
+
+Suppose
+
+summary prompt
+
+Summarize:
+
+$transcript
+
+Now this becomes a reusable template.
+
+Same for
+
+classifier_prompt
+merge_prompt
+
+\_build_summary_prompt()
+def \_build_summary_prompt(
+transcript
+)
+
+Creates the final prompt.
+
+Template
+
+Summarize:
+
+$transcript
+
+Input
+
+Python has variables...
+
+Output
+
+Summarize:
+
+Python has variables...
+
+summarize_chunk()
+
+This summarizes one chunk.
+
+Example chunk
+
+Python variables
+Loops
+Functions
+
+Step 1
+
+Start timer
+
+start = time.perf_counter()
+
+Step 2
+
+Build prompt
+
+prompt = self.\_build_summary_prompt(chunk)
+
+Step 3
+
+Call the LLM
+
+summary = self.llm.generate(
+prompt,
+json_output=True
+)
+
+Suppose the LLM returns
+
+{
+"title":"Python Basics",
+"topics":[
+"Variables",
+"Loops",
+"Functions"
+]
+}
+
+Step 4
+
+Log execution time
+
+logger.info(...)
+
+Output
+
+Chunk processed in 2.1 sec
+
+Step 5
+
+Return summary
+
+\_build_classifier_prompt()
+
+Receives
+
+summary
+
+Example
+
+{
+"topics":["Loops","Functions"]
+}
+
+Turns it into JSON text
+
+json.dumps(
+summary,
+indent=2
+)
+
+Output
+
+{
+"topics":[
+"Loops",
+"Functions"
+]
+}
+
+Then inserts it into the classifier prompt.
+
+classify_summary()
+
+Builds the prompt.
+
+Calls the LLM.
+
+Returns
+
+SubjectClassification
+
+Example
+
+{
+"subject":"Programming",
+"confidence":0.97
+}
+
+\_build_merge_prompt()
+
+Receives many summaries.
+
+Example
+
+[
+{"title":"Variables"},
+{"title":"Loops"},
+{"title":"Functions"}
+]
+
+Converts to JSON.
+
+Then inserts into merge prompt.
+
+merge_summaries()
+
+Calls the LLM with multiple summaries.
+
+Example
+
+Input
+
+Variables summary
+
+Loops summary
+
+Functions summary
+
+LLM returns
+
+{
+"title":"Python Basics",
+"topics":[
+"Variables",
+"Loops",
+"Functions"
+]
+}
+
+hierarchical_merge()
+
+This is the most interesting part.
+
+Suppose you have
+
+20 summaries
+
+Instead of merging all 20 at once, you merge them in batches.
+
+Imagine
+
+20 summaries
+
+↓
+
+5
+5
+5
+5
+
+Merge each group
+
+↓
+
+4 summaries
+
+Then merge again
+
+↓
+
+1 final summary
+
+This is called hierarchical merging or a tree reduction.
+
+Suppose
+
+batch_size = 5
+
+20 summaries
+
+Round 1
+
+1 2 3 4 5
+↓
+
+Merged A
+
+6 7 8 9 10
+↓
+
+Merged B
+
+11 12 13 14 15
+↓
+
+Merged C
+
+16 17 18 19 20
+↓
+
+Merged D
+
+Now
+
+A
+B
+C
+D
+
+Round 2
+
+Merge
+
+A B C D
+↓
+
+Final Summary
+
+Inside the loop
+
+while len(level) > 1:
+
+Keep merging until only one summary remains.
+
+Create empty list
+
+next_level = []
+
+Loop through batches
+
+for i in range(
+0,
+len(level),
+batch_size
+)
+
+Example
+
+20 summaries
+
+i
+
+0
+5
+10
+15
+
+Get one batch
+
+batch = level[i:i+batch_size]
+
+If
+
+batch_size = 5
+
+then
+
+0:5
+
+5:10
+
+10:15
+
+15:20
+
+Merge
+
+merged = self.merge_summaries(batch)
+
+Append
+
+next_level.append(merged)
+
+After one round
+
+20 summaries
+
+↓
+
+4 summaries
+
+Repeat.
+
+Eventually
+
+1 summary
+
+Return
+
+level[0]
+
+summarize()
+
+This is the main entry point.
+
+Input
+
+chunks = [
+"part1",
+"part2",
+"part3"
+]
+
+If empty
+
+if not chunks:
+
+Return
+
+[]
+
+Start timer
+
+pipeline_start
+
+Create
+
+summaries = []
+
+Loop
+
+for idx, chunk in enumerate(chunks):
+
+Example
+
+0
+chunk1
+
+1
+chunk2
+
+2
+chunk3
+
+Summarize each
+
+summary = self.summarize_chunk(chunk)
+
+Append
+
+summaries.append(summary)
+
+Now
+
+[
+summary1,
+summary2,
+summary3
+]
+
+After all chunks are summarized:
+
+final_summary = self.hierarchical_merge(
+summaries,
+batch_size=5,
+)
+
+This produces one combined summary.
+
+Return
+
+return final_summary
+
+Although the return type annotation says:
+
+-> list[dict[str, Any]]
+
+the method actually returns a single dictionary (final_summary). The annotation should be updated to:
+
+def summarize(
+self,
+chunks: list[str],
+) -> dict[str, Any]:
+
+to accurately reflect the implementation.
+
+End-to-End Example
+
+Suppose your original transcript is:
+
+Python is a programming language.
+
+It has variables.
+
+It has loops.
+
+It has functions.
+
+It supports OOP.
+
+It has exceptions.
+
+It has modules.
+
+It has decorators.
+
+You split it into four chunks:
+
+Chunk 1
+Python is a programming language.
+It has variables.
+
+Chunk 2
+It has loops.
+It has functions.
+
+Chunk 3
+It supports OOP.
+It has exceptions.
+
+Chunk 4
+It has modules.
+It has decorators.
+
+Each chunk is summarized independently:
+
+Summary 1
+{
+"topics":["Programming Language","Variables"]
+}
+
+Summary 2
+{
+"topics":["Loops","Functions"]
+}
+
+Summary 3
+{
+"topics":["OOP","Exceptions"]
+}
+
+Summary 4
+{
+"topics":["Modules","Decorators"]
+}
+
+These summaries are merged (in batches if necessary), resulting in a final summary such as:
+
+{
+"title": "Python Overview",
+"topics": [
+"Programming Language",
+"Variables",
+"Loops",
+"Functions",
+"OOP",
+"Exceptions",
+"Modules",
+"Decorators"
+]
+}
+
+Finally, classify_summary() could classify that merged summary as:
+
+{
+"subject": "Programming",
+"confidence": 0.99
+}
+
+So the overall flow is:
+
+Transcript
+│
+▼
+Split into chunks
+│
+▼
+Summarize each chunk
+│
+▼
+Structured summaries
+│
+▼
+Hierarchical merge
+│
+▼
+Final summary
+│
+▼
+(Optional) Subject classification
+
+This design scales well to very large transcripts because each LLM call stays within token limits, and the tree-style merge keeps the final aggregation efficient and manageable.
