@@ -122,7 +122,7 @@ class Summarizer:
     def hierarchical_merge(
     self,
     summaries: list[dict[str, Any]],
-    batch_size: int = 5,
+    batch_size: int = 1,
     ) -> dict[str, Any]:
         """
         Merge summaries in batches until only one remains.

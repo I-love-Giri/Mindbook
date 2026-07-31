@@ -4,7 +4,7 @@ For most RAG applications (chatbots over PDFs, transcripts, documentation), the 
 '''
 
 from typing import List, Dict
-from processing.services.cleaner import TranscriptCleaner
+from pipeline.cleaning.cleaner import TranscriptCleaner
 class TranscriptChunker:
 
     def __init__(
