@@ -90,6 +90,8 @@ class TranscriptChunker:
         use_boundaries: bool,
         use_pause: bool
     ) -> List[Dict]:
+        
+        last_boundary_index = None
 
         chunks = []
 
@@ -134,31 +136,20 @@ class TranscriptChunker:
             # Version 1
             # max_words only
             # ---------------------------
+            # Version 1
             if not use_soft_limit:
 
-                should_split = (
-                    current_word_count >= self.max_words
-                )
-
-
-            # ---------------------------
-            # Version 2 / 3
-            # soft limit
-            # ---------------------------
-            else:
-
-                if current_word_count >= self.soft_limit:
-
+                if current_word_count >= self.max_words:
                     should_split = True
 
 
-                    # ---------------------------
-                    # Version 3 additions
-                    # ---------------------------
-                    if (
-                        use_boundaries
-                        or use_pause
-                    ):
+            # Version 2 / Version 3
+            else:
+
+                # Once we cross the soft limit...
+                if current_word_count >= self.soft_limit:
+
+                    if use_boundaries or use_pause:
 
                         previous_segment = (
                             current_segments[-2]
@@ -166,15 +157,11 @@ class TranscriptChunker:
                             else None
                         )
 
-
                         boundary_found = (
                             use_boundaries
                             and
-                            self.is_natural_boundary(
-                                cleaned_text
-                            )
+                            self.is_natural_boundary(cleaned_text)
                         )
-
 
                         pause_found = (
                             use_pause
@@ -187,20 +174,67 @@ class TranscriptChunker:
                             )
                         )
 
+                        # Remember the latest good split point
+                        if boundary_found or pause_found:
+                            last_boundary_index = (
+                                len(current_segments) - 1
+                            )
 
-                        should_split = (
-                            boundary_found
-                            or
-                            pause_found
+                    else:
+                        # Version 2:
+                        # split immediately after soft limit
+                        should_split = True
+
+
+                # Force split at max limit
+                if current_word_count >= self.max_words:
+
+                    if (
+                        use_boundaries
+                        and
+                        last_boundary_index is not None
+                    ):
+
+                        # Split at the last sentence boundary
+                        chunk_segments = (
+                            current_segments[
+                                :last_boundary_index + 1
+                            ]
                         )
 
+                        chunks.append(
+                            self.create_chunk(
+                                chunk_segments,
+                                video_id,
+                                len(chunks)
+                            )
+                        )
 
+                        overlap = self.create_overlap(
+                            chunk_segments
+                        )
 
-            # Always force split at max limit
-            if current_word_count >= self.max_words:
+                        remaining = (
+                            current_segments[
+                                last_boundary_index + 1:
+                            ]
+                        )
 
-                should_split = True
+                        current_segments = (
+                            overlap + remaining
+                        )
 
+                        current_word_count = sum(
+                            len(item["text"].split())
+                            for item in current_segments
+                        )
+
+                        last_boundary_index = None
+
+                        continue
+
+                    else:
+                        should_split = True
 
 
             if should_split:
@@ -243,3 +277,148 @@ class TranscriptChunker:
 
 
         return chunks
+
+    def create_chunk(
+        self,
+        segments: List[Dict],
+        video_id: str,
+        chunk_id: int
+    ) -> Dict:
+
+
+        text = " ".join(
+            segment["text"]
+            for segment in segments
+        )
+
+
+        start = segments[0]["start"]
+
+
+        last_segment = segments[-1]
+
+        end = (
+            last_segment["start"]
+            +
+            last_segment["duration"]
+        )
+
+
+        return {
+
+            "chunk_id": chunk_id,
+
+            "video_id": video_id,
+
+            "text": text,
+
+            "start": round(start, 2),
+
+            "end": round(end, 2),
+
+            "word_count": len(text.split())
+        }
+
+
+
+    def create_overlap(
+        self,
+        segments: List[Dict]
+    ) -> List[Dict]:
+
+        overlap = []
+
+        words = 0
+
+
+        for segment in reversed(segments):
+
+            segment_words = len(
+                segment["text"].split()
+            )
+
+
+            if (
+                words + segment_words
+                <= self.overlap_words
+            ):
+
+                overlap.insert(
+                    0,
+                    segment
+                )
+
+                words += segment_words
+
+            else:
+                break
+
+
+        return overlap
+
+
+
+    def is_natural_boundary(
+        self,
+        text: str
+    ) -> bool:
+
+        text = text.strip().lower()
+
+
+        markers = [
+            "now",
+            "next",
+            "moving on",
+            "let's move on",
+            "another thing",
+            "finally",
+            "in conclusion",
+            "so",
+            "the next",
+        ]
+
+
+        if any(
+            text.startswith(marker)
+            for marker in markers
+        ):
+            return True
+
+
+        if text.endswith(
+            (
+                ".",
+                "?",
+                "!"
+            )
+        ):
+            return True
+
+
+        return False
+
+
+
+    def has_pause(
+        self,
+        previous: Dict,
+        current: Dict,
+        threshold: float = 1.5
+    ) -> bool:
+
+        previous_end = (
+            previous["start"]
+            +
+            previous["duration"]
+        )
+
+
+        gap = (
+            current["start"]
+            -
+            previous_end
+        )
+
+
+        return gap >= threshold
