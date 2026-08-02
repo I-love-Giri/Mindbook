@@ -1,11 +1,14 @@
-'''
+"""
 For most RAG applications (chatbots over PDFs, transcripts, documentation), the sentence-aware token chunker is usually the better choice because it preserves natural language structure while still respecting token limits. The raw token approach is useful when you need strict control over chunk size.
 
-'''
+"""
 
 from typing import List, Dict
+import re
+
 from pipeline.cleaning.cleaner import TranscriptCleaner
 from video_processor.models.transcript import Segment
+from pipeline.chunking.semantic_splitter import SemanticSplitter
 
 
 class TranscriptChunker:
@@ -14,411 +17,313 @@ class TranscriptChunker:
     VERSION_SOFT_LIMIT = 2
     VERSION_SEMANTIC = 3
 
-
     def __init__(
         self,
         version: int = VERSION_SEMANTIC,
         max_words: int = 300,
         overlap_words: int = 50,
-        soft_limit_ratio: float = 0.75
+        soft_limit_ratio: float = 0.75,
+        pause_threshold: float = 2.0,
     ):
+        self.semantic_splitter = SemanticSplitter()
 
         self.version = version
 
         self.max_words = max_words
         self.overlap_words = overlap_words
 
-        self.soft_limit = int(
-            max_words * soft_limit_ratio
-        )
+        self.soft_limit = int(max_words * soft_limit_ratio)
+
+        self.pause_threshold = pause_threshold
 
         self.cleaner = TranscriptCleaner()
 
-
-
-    def chunk(
-        self,
-        segments: List[Segment],
-        video_id: str
-    ) -> List[Dict]:
+    def chunk(self, segments: List[Segment], video_id: str) -> List[Dict]:
 
         if self.version == self.VERSION_BASIC:
 
-            return self._chunk(
-                segments,
-                video_id,
-                use_soft_limit=False,
-                use_boundaries=False,
-                use_pause=False
-            )
-
+            units = self.prepare_segments(segments)
 
         elif self.version == self.VERSION_SOFT_LIMIT:
 
-            return self._chunk(
-                segments,
-                video_id,
-                use_soft_limit=True,
-                use_boundaries=False,
-                use_pause=False
-            )
-
+            units = self.merge_into_sentences(segments)
 
         elif self.version == self.VERSION_SEMANTIC:
 
-            return self._chunk(
-                segments,
-                video_id,
-                use_soft_limit=True,
-                use_boundaries=True,
-                use_pause=True
-            )
+            sentences = self.merge_into_sentences(segments)
 
+            semantic_groups = self.semantic_splitter.split(sentences)
+
+            units = [self.merge_group(group) for group in semantic_groups]
+
+            units = self.merge_into_sentences(segments)
 
         else:
-            raise ValueError(
-                f"Unknown chunking version: {self.version}"
-            )
+            raise ValueError(f"Unknown version {self.version}")
 
+        return self.chunk_units(units, video_id)
 
+    # --------------------------------------------------
+    # Clean Whisper output
+    # --------------------------------------------------
 
-    def _chunk(
-        self,
-        segments: List[Segment],
-        video_id: str,
-        use_soft_limit: bool,
-        use_boundaries: bool,
-        use_pause: bool
-    ) -> List[Dict]:
-        
-        last_boundary_index = None
+    def prepare_segments(self, segments: List[Segment]) -> List[Dict]:
 
-        chunks = []
-
-        current_segments = []
-        current_word_count = 0
-
+        result = []
 
         for segment in segments:
 
-            cleaned_text = self.cleaner.clean(
-                segment.text
-            )
+            text = self.cleaner.clean(segment.text)
 
-            if not cleaned_text:
+            if not text:
                 continue
 
-
-            segment_data = {
-                "text": cleaned_text,
-                "start": segment.start,
-                "duration": segment.duration
-            }
-
-
-            words = len(
-                cleaned_text.split()
+            result.append(
+                {
+                    "text": text,
+                    "start": segment.start,
+                    "duration": segment.duration,
+                    "end": (segment.start + segment.duration),
+                    "words": len(text.split()),
+                }
             )
 
+        return result
 
-            current_segments.append(
-                segment_data
+    # --------------------------------------------------
+    # Convert Whisper segments into sentences
+    # --------------------------------------------------
+
+    def merge_into_sentences(self, segments: List[Segment]) -> List[Dict]:
+
+        cleaned = self.prepare_segments(segments)
+
+        sentences = []
+
+        current = []
+
+        start = None
+
+        previous_end = None
+
+        for segment in cleaned:
+
+            if start is None:
+                start = segment["start"]
+
+            gap = 0
+
+            if previous_end:
+
+                gap = segment["start"] - previous_end
+
+            current.append(segment)
+
+            text = " ".join(x["text"] for x in current)
+
+            boundary = (
+                self.ends_sentence(text)
+                or gap > self.pause_threshold
+                or self.looks_like_topic_shift(current)
             )
 
-            current_word_count += words
+            if boundary:
 
+                sentences.append(self.create_sentence(current, start))
 
-            should_split = False
+                current = []
+                start = None
 
+            previous_end = segment["end"]
 
+        if current:
 
-            # ---------------------------
-            # Version 1
-            # max_words only
-            # ---------------------------
-            # Version 1
-            if not use_soft_limit:
+            sentences.append(self.create_sentence(current, start))
 
-                if current_word_count >= self.max_words:
-                    should_split = True
+        return sentences
 
+    def merge_group(self, group):
 
-            # Version 2 / Version 3
-            else:
+        text = " ".join(x["text"] for x in group)
 
-                # Once we cross the soft limit...
-                if current_word_count >= self.soft_limit:
-
-                    if use_boundaries or use_pause:
-
-                        previous_segment = (
-                            current_segments[-2]
-                            if len(current_segments) > 1
-                            else None
-                        )
-
-                        boundary_found = (
-                            use_boundaries
-                            and
-                            self.is_natural_boundary(cleaned_text)
-                        )
-
-                        pause_found = (
-                            use_pause
-                            and
-                            previous_segment
-                            and
-                            self.has_pause(
-                                previous_segment,
-                                segment_data
-                            )
-                        )
-
-                        # Remember the latest good split point
-                        if boundary_found or pause_found:
-                            last_boundary_index = (
-                                len(current_segments) - 1
-                            )
-
-                    else:
-                        # Version 2:
-                        # split immediately after soft limit
-                        should_split = True
-
-
-                # Force split at max limit
-                if current_word_count >= self.max_words:
-
-                    if (
-                        use_boundaries
-                        and
-                        last_boundary_index is not None
-                    ):
-
-                        # Split at the last sentence boundary
-                        chunk_segments = (
-                            current_segments[
-                                :last_boundary_index + 1
-                            ]
-                        )
-
-                        chunks.append(
-                            self.create_chunk(
-                                chunk_segments,
-                                video_id,
-                                len(chunks)
-                            )
-                        )
-
-                        overlap = self.create_overlap(
-                            chunk_segments
-                        )
-
-                        remaining = (
-                            current_segments[
-                                last_boundary_index + 1:
-                            ]
-                        )
-
-                        current_segments = (
-                            overlap + remaining
-                        )
-
-                        current_word_count = sum(
-                            len(item["text"].split())
-                            for item in current_segments
-                        )
-
-                        last_boundary_index = None
-
-                        continue
-
-                    else:
-                        should_split = True
-
-
-            if should_split:
-
-                chunks.append(
-                    self.create_chunk(
-                        current_segments,
-                        video_id,
-                        len(chunks)
-                    )
-                )
-
-
-                overlap = self.create_overlap(
-                    current_segments
-                )
-
-
-                current_segments = overlap
-
-
-                current_word_count = sum(
-                    len(item["text"].split())
-                    for item in current_segments
-                )
-
-
-
-        # Remaining chunk
-
-        if current_segments:
-
-            chunks.append(
-                self.create_chunk(
-                    current_segments,
-                    video_id,
-                    len(chunks)
-                )
-            )
-
-
-        return chunks
-
-    def create_chunk(
-        self,
-        segments: List[Dict],
-        video_id: str,
-        chunk_id: int
-    ) -> Dict:
-
-
-        text = " ".join(
-            segment["text"]
-            for segment in segments
-        )
-
-
-        start = segments[0]["start"]
-
-
-        last_segment = segments[-1]
-
-        end = (
-            last_segment["start"]
-            +
-            last_segment["duration"]
-        )
-
+        end = group[-1]["start"] + group[-1]["duration"]
 
         return {
-
-            "chunk_id": chunk_id,
-
-            "video_id": video_id,
-
             "text": text,
-
-            "start": round(start, 2),
-
-            "end": round(end, 2),
-
-            "word_count": len(text.split())
+            "start": group[0]["start"],
+            "duration": group[-1]["start"] + group[-1]["duration"] - group[0]["start"],
+            "end": end,
+            "words": len(text.split()),
         }
 
+    def create_sentence(self, units, start):
 
+        text = " ".join(x["text"] for x in units)
 
-    def create_overlap(
-        self,
-        segments: List[Dict]
-    ) -> List[Dict]:
+        return {
+            "text": text,
+            "start": start,
+            "duration": units[-1]["end"] - start,
+            "end": units[-1]["end"],
+            "words": len(text.split()),
+        }
 
-        overlap = []
+    def ends_sentence(self, text: str) -> bool:
+
+        return bool(re.search(r"[.!?][\"']?$", text.strip()))
+
+    def looks_like_topic_shift(self, units) -> bool:
+
+        if len(units) < 2:
+            return False
+
+        text = units[-1]["text"].lower()
+
+        starters = [
+            "now",
+            "next",
+            "another",
+            "finally",
+            "however",
+            "in conclusion",
+            "let's move",
+            "moving on",
+        ]
+
+        return any(text.startswith(x) for x in starters)
+
+    # --------------------------------------------------
+    # Chunk creation
+    # --------------------------------------------------
+
+    def chunk_units(self, units: List[Dict], video_id: str) -> List[Dict]:
+
+        chunks = []
+
+        current = []
 
         words = 0
 
+        for unit in units:
 
-        for segment in reversed(segments):
+            if unit["words"] > self.max_words:
 
-            segment_words = len(
-                segment["text"].split()
+                if current:
+
+                    chunks.append(self.create_chunk(current, video_id, len(chunks)))
+
+                    current = []
+
+                    words = 0
+
+                chunks.extend(self.split_long_unit(unit, video_id, len(chunks)))
+
+                continue
+
+            current.append(unit)
+
+            words += unit["words"]
+
+            split = False
+
+            if self.version == self.VERSION_BASIC:
+
+                split = words >= self.max_words
+
+            elif self.version in (self.VERSION_SOFT_LIMIT, self.VERSION_SEMANTIC):
+
+                # Semantic groups are already natural boundaries.
+                # Soft limit decides when to emit a chunk.
+                split = words >= self.soft_limit
+
+            # Hard safety limit
+            if words >= self.max_words:
+                split = True
+
+            if split:
+
+                chunks.append(self.create_chunk(current, video_id, len(chunks)))
+
+                current = self.create_overlap(current)
+
+                words = sum(x["words"] for x in current)
+
+        if current:
+
+            chunks.append(self.create_chunk(current, video_id, len(chunks)))
+
+        return chunks
+
+    # --------------------------------------------------
+    # Split huge sentences safely
+    # --------------------------------------------------
+
+    def split_long_unit(self, unit: Dict, video_id: str, chunk_id: int) -> List[Dict]:
+
+        words = unit["text"].split()
+
+        chunks = []
+
+        step = self.max_words - self.overlap_words
+
+        for i in range(0, len(words), step):
+
+            part = words[i : i + self.max_words]
+
+            text = " ".join(part)
+
+            chunks.append(
+                {
+                    "chunk_id": chunk_id,
+                    "video_id": video_id,
+                    "text": text,
+                    "start": round(unit["start"], 2),
+                    "end": round(unit.get("end", unit["start"] + unit["duration"]), 2),
+                    "word_count": len(part),
+                }
             )
 
+            chunk_id += 1
 
-            if (
-                words + segment_words
-                <= self.overlap_words
-            ):
+        return chunks
 
-                overlap.insert(
-                    0,
-                    segment
-                )
+    # --------------------------------------------------
+    # Overlap
+    # --------------------------------------------------
 
-                words += segment_words
+    def create_overlap(self, units: List[Dict]) -> List[Dict]:
+
+        result = []
+
+        count = 0
+
+        for unit in reversed(units):
+
+            if count + unit["words"] <= self.overlap_words:
+
+                result.insert(0, unit)
+
+                count += unit["words"]
 
             else:
+
                 break
 
+        return result
 
-        return overlap
+    # --------------------------------------------------
+    # Final output
+    # --------------------------------------------------
 
+    def create_chunk(self, units: List[Dict], video_id: str, chunk_id: int) -> Dict:
 
+        text = " ".join(x["text"] for x in units)
 
-    def is_natural_boundary(
-        self,
-        text: str
-    ) -> bool:
-
-        text = text.strip().lower()
-
-
-        markers = [
-            "now",
-            "next",
-            "moving on",
-            "let's move on",
-            "another thing",
-            "finally",
-            "in conclusion",
-            "so",
-            "the next",
-        ]
-
-
-        if any(
-            text.startswith(marker)
-            for marker in markers
-        ):
-            return True
-
-
-        if text.endswith(
-            (
-                ".",
-                "?",
-                "!"
-            )
-        ):
-            return True
-
-
-        return False
-
-
-
-    def has_pause(
-        self,
-        previous: Dict,
-        current: Dict,
-        threshold: float = 1.5
-    ) -> bool:
-
-        previous_end = (
-            previous["start"]
-            +
-            previous["duration"]
-        )
-
-
-        gap = (
-            current["start"]
-            -
-            previous_end
-        )
-
-
-        return gap >= threshold
+        return {
+            "chunk_id": chunk_id,
+            "video_id": video_id,
+            "text": text,
+            "start": round(units[0]["start"], 2),
+            "end": round(units[-1]["end"], 2),
+            "word_count": len(text.split()),
+        }
