@@ -1,6 +1,8 @@
-# Virtual environment
+# Virtual environments
+.venv/
 venv/
-.env
+venv_old/
+
 
 
 # Python cache
@@ -29,3 +31,16 @@ transcripts.db
 
 #environment variables
 .env
+
+#old venv
+venv_old/
+
+#config files
+config
+
+# Chunking output files
+*_chunking.json
+
+# Qdrant data
+qdrant_data/
+
