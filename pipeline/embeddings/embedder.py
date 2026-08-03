@@ -24,4 +24,6 @@ class EmbeddingService:
 
     def embed_query(self, query: str):
 
-        return self.model.encode(query, normalize_embeddings=True)
+        embedding = self.model.encode(query, normalize_embeddings=True)
+
+        return embedding.tolist()

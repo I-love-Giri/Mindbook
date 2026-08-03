@@ -1,4 +1,4 @@
-'''
+"""
 from cache.memory_cache import MemoryCache
 from processing.services.cleaner import TranscriptCleaner
 from storage.sqlite_storage import SQLiteStorage
@@ -9,7 +9,7 @@ class TranscriptService:
     def __init__(self, db=None):
         self.cache = MemoryCache()
         self.db = db or SQLiteStorage()
-    
+
     def clean_transcript(self, transcript):
         for segment in transcript.segments:
             segment.text = TranscriptCleaner.clean(segment.text)
@@ -39,7 +39,7 @@ class TranscriptService:
 
         if transcript is None:
             return None
-        
+
         # Clean transcript text
         transcript = self.clean_transcript(transcript)
 
@@ -50,11 +50,11 @@ class TranscriptService:
 
         return transcript
 
-'''
+"""
 
 from typing import Optional
 from cache.memory_cache import MemoryCache
-from processing.services.cleaner import TranscriptCleaner
+from pipeline.cleaning.cleaner import TranscriptCleaner
 from storage.base_storage import BaseStorage
 from storage.mongo_storage import MongoStorage
 from video_processor.services.youtube_service import YoutubeTranscriptService
@@ -70,7 +70,7 @@ class TranscriptService:
             segment.text = TranscriptCleaner.clean(segment.text)
 
         return transcript
-    
+
     def save(self, transcript):
         self.db.save(transcript)
         self.cache.set(transcript.video_id, transcript)
@@ -102,9 +102,9 @@ class TranscriptService:
 
         # 4. Save
         self.save(transcript)
-        
-        #self.cache.set(video_id, transcript)
-    
+
+        # self.cache.set(video_id, transcript)
+
         return transcript
 
     def close(self):
