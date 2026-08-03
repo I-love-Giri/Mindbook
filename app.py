@@ -4,10 +4,9 @@ import streamlit as st
 from config.prompts.services.prompt_manager import PromptManager
 from llm.groq_service import LLMService
 from llm.services.summarizer import Summarizer
-from processing.services.chunker import TranscriptChunker
+from pipeline.chunking.chunker import TranscriptChunker
 from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
-
 
 st.set_page_config(page_title="YouTube Summarizer", layout="wide")
 
@@ -40,13 +39,11 @@ if st.button("Generate Summary"):
         with st.spinner("Summarizing video..."):
 
             chunker = TranscriptChunker(max_words=500)
-            chunks = chunker.chunk(transcript.segments,transcript.video_id)
+            chunks = chunker.chunk(transcript.segments, transcript.video_id)
 
             llm = LLMService()
 
-            prompt = PromptManager(
-                Path(__file__).parent / "config" / "prompts"
-            )
+            prompt = PromptManager(Path(__file__).parent / "config" / "prompts")
 
             summarizer = Summarizer(
                 llm=llm,
@@ -72,11 +69,4 @@ if st.button("Generate Summary"):
         st.write(transcript.text)
 
 
-
-
-
-
-
-#print(transcript.text)
-
-
+# print(transcript.text)
