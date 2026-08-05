@@ -1,142 +1,162 @@
 import json
+import time
+import logging
+
 from string import Template
 from typing import Any
-import logging
-import time
 
 from config.prompts.services.prompt_manager import PromptManager
-from config.prompts.services.pyd_model import SubjectClassification
+from config.prompts.services.prompt_registry import PromptRegistry
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
 
 
 class Summarizer:
+
     def __init__(
         self,
-        llm: LLMService,
-        prompts: PromptManager,
+        llm,
+        prompts: PromptRegistry,
     ):
+
         self.llm = llm
         self.prompts = prompts
 
-        self.summary_prompt = Template(
-            self.prompts.get("summary")
-        )
+        self.chunk_summary_prompt = prompts.chunk_summary()
 
-        self.classifier_prompt = Template(
-            self.prompts.get("subject_classifier")
-        )
+        self.chapter_summary_prompt = prompts.chapter_summary()
 
-        self.merge_prompt = Template(
-            self.prompts.get("merge_summary")
-        )
+        self.video_summary_prompt = prompts.video_summary()
 
+        self.domain_classifier_prompt = prompts.domain_classifier()
 
-    def _build_summary_prompt(
+    # --------------------------------------------------
+    # Prompt Builders
+    # --------------------------------------------------
+
+    def _build_chunk_prompt(
         self,
         transcript: str,
     ) -> str:
-        return self.summary_prompt.substitute(
-            transcript=transcript
-        )
 
-    def summarize_chunk(
+        return self.chunk_summary_prompt.substitute(transcript=transcript)
+
+    def _build_chapter_prompt(
         self,
-        chunk: str,
-    ) -> dict[str, Any]:
-        """
-        Generate a structured summary for a single transcript chunk.
-        """
+        summaries: list[dict[str, Any]],
+    ) -> str:
 
-        start = time.perf_counter()
-
-        prompt = self._build_summary_prompt(chunk)
-
-        summary = self.llm.generate(
-            prompt,
-            json_output=True,
+        return self.chapter_summary_prompt.substitute(
+            sections=json.dumps(
+                summaries,
+                ensure_ascii=False,
+                indent=2,
+            )
         )
 
-        logger.info(
-            "Chunk processed in %.2f sec",
-            time.perf_counter() - start,
-        )
+    def _build_video_prompt(
+        self,
+        chapter_summary: dict[str, Any],
+    ) -> str:
 
-        return summary
+        return self.video_summary_prompt.substitute(
+            chapters=json.dumps(
+                chapter_summary,
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
 
     def _build_classifier_prompt(
         self,
         summary: dict[str, Any],
     ) -> str:
-        return self.classifier_prompt.substitute(
+
+        return self.domain_classifier_prompt.substitute(
             summary=json.dumps(
                 summary,
-                indent=2,
                 ensure_ascii=False,
+                indent=2,
             )
         )
 
-    def classify_summary(
-        self,
-        summary: dict[str, Any],
-    ) -> SubjectClassification:
-        prompt = self._build_classifier_prompt(summary)
+    # --------------------------------------------------
+    # Chunk Summary
+    # --------------------------------------------------
 
-        response = self.llm.generate(
+    def summarize_chunk(
+        self,
+        chunk: str,
+    ) -> dict[str, Any]:
+
+        start = time.perf_counter()
+
+        prompt = self._build_chunk_prompt(chunk)
+
+        result = self.llm.generate(
             prompt,
             json_output=True,
         )
 
-        return response
-    
-    def _build_merge_prompt(
-        self,
-        summaries: list[dict[str, Any]],
-    ) -> str:
-        return self.merge_prompt.substitute(
-            summaries=json.dumps(
-                summaries,
-                ensure_ascii=False,
-                separators=(",", ":"),
-            )
+        logger.info(
+            "Chunk summarized in %.2fs",
+            time.perf_counter() - start,
         )
-    
-    def merge_summaries(
-    self,
-    summaries: list[dict[str, Any]],
-    ) -> dict[str, Any]:
-        """
-        Merge several structured summaries into one.
-        """
 
-        prompt = self._build_merge_prompt(
-            summaries
-        )
+        return result
+
+    # --------------------------------------------------
+    # Domain Classification
+    # --------------------------------------------------
+
+    def classify_summary(
+        self,
+        summary: dict[str, Any],
+    ) -> dict[str, Any]:
+
+        prompt = self._build_classifier_prompt(summary)
 
         return self.llm.generate(
             prompt,
             json_output=True,
         )
-    
-    def hierarchical_merge(
-    self,
-    summaries: list[dict[str, Any]],
-    batch_size: int = 1,
+
+    # --------------------------------------------------
+    # Chapter Merge
+    # --------------------------------------------------
+
+    def merge_summaries(
+        self,
+        summaries: list[dict[str, Any]],
     ) -> dict[str, Any]:
-        """
-        Merge summaries in batches until only one remains.
-        """
+
+        prompt = self._build_chapter_prompt(summaries)
+
+        return self.llm.generate(
+            prompt,
+            json_output=True,
+        )
+
+    # --------------------------------------------------
+    # Hierarchical Merge
+    # --------------------------------------------------
+
+    def hierarchical_merge(
+        self,
+        summaries: list[dict[str, Any]],
+        batch_size: int = 5,
+    ) -> dict[str, Any]:
 
         level = summaries
 
-        round_num = 1
+        round_number = 1
 
         while len(level) > 1:
 
             logger.info(
-                "Merge round %d (%d summaries)",
-                round_num,
+                "Merge round %d | %d summaries",
+                round_number,
                 len(level),
             )
 
@@ -148,94 +168,105 @@ class Summarizer:
                 batch_size,
             ):
 
-                batch = level[
-                    i:i + batch_size
-                ]
+                batch = level[i : i + batch_size]
 
-                merged = self.merge_summaries(
-                    batch
-                )
+                merged = self.merge_summaries(batch)
 
-                next_level.append(
-                    merged
-                )
+                next_level.append(merged)
 
             level = next_level
 
-            round_num += 1
+            round_number += 1
 
         return level[0]
 
+    # --------------------------------------------------
+    # Final Video Summary
+    # --------------------------------------------------
 
+    def create_video_summary(
+        self,
+        chapter_summary: dict[str, Any],
+    ) -> dict[str, Any]:
 
+        prompt = self._build_video_prompt(chapter_summary)
+
+        return self.llm.generate(
+            prompt,
+            json_output=True,
+        )
+
+    # --------------------------------------------------
+    # Main Pipeline
+    # --------------------------------------------------
 
     def summarize(
         self,
         chunks: list[str],
-    ) -> list[dict[str, Any]]:
-        """
-        Sequential summarization.
-        No threading.
-        No batching.
-        No combining.
-        """
+    ) -> dict[str, Any]:
 
         if not chunks:
-            logger.warning(
-                "No transcript chunks received."
-            )
 
-            return []
+            logger.warning("No transcript chunks received.")
+
+            return {}
 
         pipeline_start = time.perf_counter()
 
         logger.info(
-            "Starting sequential summarization (%d chunks)",
+            "Starting summarization | chunks=%d",
             len(chunks),
         )
 
-        summaries = []
+        chunk_summaries = []
 
-        for idx, chunk in enumerate(chunks):
+        # Step 1:
+        # Summarize every transcript chunk
+
+        for index, chunk in enumerate(chunks):
 
             try:
+
                 summary = self.summarize_chunk(chunk)
 
-                summaries.append(summary)
+                chunk_summaries.append(summary)
 
                 logger.info(
                     "Completed chunk %d/%d",
-                    idx + 1,
+                    index + 1,
                     len(chunks),
                 )
 
             except Exception:
+
                 logger.exception(
-                    "Failed to summarize chunk %d",
-                    idx + 1,
+                    "Failed chunk %d",
+                    index + 1,
                 )
+
                 raise
 
-        logger.info(
-            "Total summarization completed in %.2f sec",
-            time.perf_counter() - pipeline_start,
-        )
+        # Step 2:
+        # Merge chunk summaries into chapter
 
-        final_summary = self.hierarchical_merge(
-            summaries,
+        chapter_summary = self.hierarchical_merge(
+            chunk_summaries,
             batch_size=5,
         )
 
+        # Step 3:
+        # Generate final learning summary
+
+        final_summary = self.create_video_summary(chapter_summary)
+
         logger.info(
-            "Total summarization completed in %.2f sec",
+            "Total pipeline time %.2fs",
             time.perf_counter() - pipeline_start,
         )
 
         return final_summary
 
-        #return final_summary
-
-
+        # return final_summary
 
 
 '''
@@ -467,7 +498,7 @@ class Summarizer:
 '''
 
 
-'''
+"""
 --------------------------------------------------------------------------------------------
 Initial Strategy (Version 1)
 --------------------------------------------------------------------------------------------
@@ -996,4 +1027,4 @@ So Version 3 improves both scalability and performance.
 5. Memory Usage Is More Predictable
 You still keep all partial summaries in memory, but each LLM request only needs to process a small batch of summaries rather than one enormous combined prompt. This makes the size of individual requests predictable and independent of the total transcript size.
 
-'''
+"""

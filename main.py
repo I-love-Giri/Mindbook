@@ -4,6 +4,8 @@ from pprint import pprint
 import sys
 from pipeline.chunking.chunker import TranscriptChunker
 from pipeline.embeddings.embedder import EmbeddingService
+from pipeline.rag.context_builder import ContextBuilder
+from pipeline.rag.generator import Generator
 from pipeline.retrieval.retriever import Retriever
 from pipeline.vectorstore.qdrant_store import QdrantStore
 from video_processor.services.parser import extract_video_id
@@ -36,11 +38,13 @@ if __name__ == "__main__":
 
     store.upsert(result, vectors)
 
-    pprint(result[0])
+    # pprint(result[0])
 
     print("Video indexed successfully!")
 
     retriever = Retriever(embedding_service, store)
+
+    generator = Generator()
 
     while True:
 
@@ -51,6 +55,18 @@ if __name__ == "__main__":
 
         results = retriever.retrieve(query, limit=5)
 
+        context_builder = ContextBuilder()
+
+        context = context_builder.build(results)
+
+        answer = generator.generate(query, context)
+
+        print("\nAnswer:")
+        print(answer)
+
+        # print(context)
+
+        """
         pprint(results)
 
         print("\nRetrieved Chunks:\n")
@@ -62,6 +78,7 @@ if __name__ == "__main__":
             print(f"Time: {chunk['start']} - {chunk['end']}")
             print(chunk["text"])
             print()
+        """
 
     if os.path.exists(f"{id}_chunking.json"):
         with open(f"{id}_chunking.json", "r", encoding="utf-8") as f:

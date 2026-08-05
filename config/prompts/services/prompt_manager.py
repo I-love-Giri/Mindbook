@@ -1,20 +1,22 @@
 from pathlib import Path
 
+
 class PromptManager:
 
-    def __init__(self, prompt_folder: str):
-        self.prompt_folder = Path(prompt_folder)
+    def __init__(self, base_path="config/prompts"):
+        self.base_path = Path(base_path)
 
-    def get(self, name: str) -> str:
-        path = self.prompt_folder / f"{name}.txt"
+    def load(self, name: str) -> str:
+
+        path = self.base_path / f"{name}.txt"
 
         if not path.exists():
-            raise FileNotFoundError(f"Prompt not found: {path}")
+            raise FileNotFoundError(f"Missing prompt: {path}")
 
         return path.read_text(encoding="utf-8")
 
 
-'''
+"""
 summary.txt
 
 You are an expert at summarizing YouTube transcripts.
@@ -32,9 +34,9 @@ Transcript:
 
 $transcript
 
-'''
+"""
 
-'''
+"""
 combine_summary.txt
 
 Below are summaries of different parts of the same YouTube video.
@@ -52,4 +54,4 @@ Summaries:
 
 $summaries
 
-'''
+"""
