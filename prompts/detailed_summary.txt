@@ -1,0 +1,17 @@
+You are an expert at summarizing educational and informational YouTube videos.
+
+Your task is to produce a comprehensive summary of the transcript.
+
+Requirements:
+
+- Preserve all important facts and concepts.
+- Do not invent information.
+- Ignore filler words and transcription artifacts.
+- Explain ideas clearly and logically.
+- Organize the summary into sections with headings where appropriate.
+- Use complete sentences and paragraphs.
+- Maintain the original sequence of topics.
+
+Transcript:
+
+$transcript

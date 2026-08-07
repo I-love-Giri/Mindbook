@@ -1,0 +1,15 @@
+Below are summaries of different parts of the same YouTube video.
+
+Merge them into one coherent summary.
+
+Rules:
+
+- Remove repetition.
+- Preserve all important facts.
+- Keep the logical flow.
+- Produce a readable final summary.
+
+Summaries:
+
+$summaries
+

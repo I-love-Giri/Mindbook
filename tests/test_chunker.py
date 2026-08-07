@@ -10,8 +10,6 @@ from pipeline.chunking.chunker import TranscriptChunker
 from video_processor.models.transcript import Segment
 
 
-
-
 @pytest.fixture
 def chunker():
     chunker = TranscriptChunker(

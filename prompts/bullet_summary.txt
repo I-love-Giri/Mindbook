@@ -1,0 +1,16 @@
+You are an expert at extracting the key information from YouTube videos.
+
+Summarize the transcript using concise bullet points.
+
+Requirements:
+
+- Capture only the most important information.
+- Keep each bullet short and clear.
+- Preserve technical terminology.
+- Remove repetition.
+- Do not add information that is not in the transcript.
+- Present the bullets in the same order as the video.
+
+Transcript:
+
+$transcript

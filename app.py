@@ -1,14 +1,9 @@
 from pathlib import Path
-import streamlit as st
-
 
 from config.prompts.services.prompt_manager import PromptManager
-
 from config.prompts.services.prompt_registry import PromptRegistry
 
-
 from llm.groq_service import LLMService
-
 from llm.services.summarizer import Summarizer
 
 from pipeline.chunking.chunker import TranscriptChunker
@@ -17,11 +12,9 @@ from storage.services.transcript_service import TranscriptService
 
 from video_processor.services.parser import extract_video_id
 
-
 from pipeline.embeddings.embedder import EmbeddingService
 
 from pipeline.rag.context_builder import ContextBuilder
-
 from pipeline.rag.generator import Generator
 
 from pipeline.retrieval.retriever import Retriever
@@ -29,21 +22,10 @@ from pipeline.retrieval.retriever import Retriever
 from pipeline.vectorstore.qdrant_store import QdrantStore
 
 # --------------------------------------------------
-# Streamlit Config
-# --------------------------------------------------
-
-st.set_page_config(page_title="YouTube Summarizer", layout="wide")
-
-
-st.title("🎥 YouTube Video Summarizer")
-
-
-# --------------------------------------------------
 # Dependency Container
 # --------------------------------------------------
 
 
-@st.cache_resource
 def get_services():
 
     prompt_manager = PromptManager(base_path=(Path(__file__).parent / "config/prompts"))
@@ -61,7 +43,10 @@ def get_services():
 
     store = QdrantStore()
 
-    retriever = Retriever(embedding_service, store)
+    retriever = Retriever(
+        embedding_service,
+        store,
+    )
 
     generator = Generator()
 
@@ -74,171 +59,158 @@ def get_services():
     }
 
 
-services = get_services()
-
-
-# --------------------------------------------------
-# Session State
-# --------------------------------------------------
-
-if "summary" not in st.session_state:
-    st.session_state.summary = None
-
-
-if "classification" not in st.session_state:
-    st.session_state.classification = None
-
-
-if "retriever" not in st.session_state:
-    st.session_state.retriever = None
-
-
-if "generator" not in st.session_state:
-    st.session_state.generator = None
-
-
-# --------------------------------------------------
-# Input
-# --------------------------------------------------
-
-url = st.text_input("Enter YouTube URL")
-
-
 # --------------------------------------------------
 # Generate Summary
 # --------------------------------------------------
 
-if st.button("Generate Summary"):
+
+def generate_summary(url, services):
 
     if not url:
+        raise ValueError("YouTube URL is required.")
 
-        st.warning("Please enter a YouTube URL.")
+    # -------------------------
+    # Load Transcript
+    # -------------------------
 
-        st.stop()
+    video_id = extract_video_id(url)
 
-    with st.spinner("Loading transcript..."):
+    transcript_service = TranscriptService()
 
-        video_id = extract_video_id(url)
+    transcript = transcript_service.get(video_id)
 
-        transcript_service = TranscriptService()
-
-        transcript = transcript_service.get(video_id)
+    # -------------------------
+    # Load Existing Summary
+    # -------------------------
 
     if transcript.summary:
 
-        summary = transcript.summary
-
-        classification = transcript.classification
-
-        st.success("Loaded summary from database.")
-
-    else:
-
-        with st.spinner("Processing video..."):
-
-            # -------------------------
-            # Chunk transcript
-            # -------------------------
-
-            chunker = TranscriptChunker(3)
-
-            chunks = chunker.chunk(
-                transcript.segments,
-                transcript.video_id,
-            )
-
-            # -------------------------
-            # Vector Store
-            # -------------------------
-
-            embedding_service = services["embedding"]
-
-            vectors = embedding_service.embed_chunks(chunks)
-
-            store = services["store"]
-
-            store.delete_collection()
-
-            store.upsert(chunks, vectors)
-
-            # -------------------------
-            # Summarization
-            # -------------------------
-
-            summarizer = services["summarizer"]
-
-            summary = summarizer.summarize(chunks)
-
-            classification = summarizer.classify_summary(summary)
-
-            transcript.summary = summary
-
-            transcript.classification = classification
-
-            transcript_service.save(transcript)
+        return {
+            "summary": transcript.summary,
+            "classification": transcript.classification,
+            "retriever": services["retriever"],
+            "generator": services["generator"],
+        }
 
     # -------------------------
-    # Session storage
+    # Chunk Transcript
     # -------------------------
 
-    st.session_state.summary = summary
+    chunker = TranscriptChunker(3)
 
-    st.session_state.classification = classification
+    chunks = chunker.chunk(
+        transcript.segments,
+        transcript.video_id,
+    )
 
-    st.session_state.retriever = services["retriever"]
+    # -------------------------
+    # Vector Store
+    # -------------------------
 
-    st.session_state.generator = services["generator"]
+    embedding_service = services["embedding"]
+
+    vectors = embedding_service.embed_chunks(chunks)
+
+    store = services["store"]
+
+    store.delete_collection()
+
+    store.upsert(
+        chunks,
+        vectors,
+    )
+
+    # -------------------------
+    # Summarization
+    # -------------------------
+
+    summarizer = services["summarizer"]
+
+    summary = summarizer.summarize(chunks)
+
+    classification = summarizer.classify_summary(summary)
+
+    # -------------------------
+    # Save Result
+    # -------------------------
+
+    transcript.summary = summary
+
+    transcript.classification = classification
+
+    transcript_service.save(transcript)
+
+    return {
+        "summary": summary,
+        "classification": classification,
+        "retriever": services["retriever"],
+        "generator": services["generator"],
+    }
 
 
 # --------------------------------------------------
-# Display Summary
+# Question Answering
 # --------------------------------------------------
 
-if st.session_state.summary:
 
-    st.subheader("📝 Summary")
+def ask_question(query, retriever, generator):
 
-    st.json(st.session_state.summary)
+    if not query.strip():
+        raise ValueError("Question cannot be empty.")
 
-    st.subheader("🏷️ Classification")
+    results = retriever.retrieve(
+        query,
+        limit=5,
+    )
 
-    st.json(st.session_state.classification)
+    context_builder = ContextBuilder()
 
-    st.divider()
+    context = context_builder.build(results)
 
-    st.subheader("💬 Ask Questions About The Video")
+    answer = generator.generate(
+        query,
+        context,
+    )
 
-    query = st.text_input("Ask a question", key="question_input")
+    return answer
 
-    if st.button("Get Answer"):
 
-        if query.strip():
+# --------------------------------------------------
+# CLI Execution Example
+# --------------------------------------------------
 
-            with st.spinner("Generating answer..."):
+if __name__ == "__main__":
 
-                retriever = st.session_state.retriever
+    services = get_services()
 
-                results = retriever.retrieve(
-                    query,
-                    limit=5,
-                )
+    youtube_url = input("Enter YouTube URL: ")
 
-                context_builder = ContextBuilder()
+    result = generate_summary(
+        youtube_url,
+        services,
+    )
 
-                context = context_builder.build(results)
+    print("\nSummary:")
+    print(result["summary"])
 
-                answer = st.session_state.generator.generate(
-                    query,
-                    context,
-                )
+    print("\nClassification:")
+    print(result["classification"])
 
-            st.markdown("### Answer")
+    while True:
 
-            st.write(answer)
+        question = input("\nAsk a question (or type exit): ")
 
-        else:
+        if question.lower() == "exit":
+            break
 
-            st.warning("Please enter a question.")
+        answer = ask_question(
+            question,
+            result["retriever"],
+            result["generator"],
+        )
+
+        print("\nAnswer:")
+        print(answer)
 
     # st.subheader("🏷 Classification")
     # st.success(classification)

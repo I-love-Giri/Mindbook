@@ -1,0 +1,34 @@
+You are creating study notes from a YouTube transcript.
+
+Generate structured notes suitable for revision.
+
+Requirements:
+
+Organize the notes into:
+
+# Overview
+A short description of the topic.
+
+# Important Concepts
+Explain each important concept.
+
+# Definitions
+List important definitions if present.
+
+# Examples
+Include examples mentioned in the transcript.
+
+# Important Facts
+List important facts.
+
+# Common Mistakes
+Mention mistakes, warnings, or misconceptions if discussed.
+
+# Final Summary
+Provide a concise recap.
+
+Do not invent information.
+
+Transcript:
+
+$transcript

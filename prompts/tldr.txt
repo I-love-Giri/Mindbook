@@ -1,0 +1,14 @@
+You are an expert summarizer.
+
+Summarize the transcript in no more than 5 concise sentences.
+
+Requirements:
+
+- Capture the core idea.
+- Preserve important conclusions.
+- Do not include unnecessary details.
+- Do not invent information.
+
+Transcript:
+
+$transcript

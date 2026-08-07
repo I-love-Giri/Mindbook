@@ -1,4 +1,4 @@
-from processing.services.cleaner import TranscriptCleaner
+from pipeline.cleaning.cleaner import TranscriptCleaner
 
 
 def test_remove_extra_spaces():
