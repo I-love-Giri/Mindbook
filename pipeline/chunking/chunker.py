@@ -3,7 +3,7 @@ For most RAG applications (chatbots over PDFs, transcripts, documentation), the 
 
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional
 import re
 
 from pipeline.cleaning.cleaner import TranscriptCleaner
@@ -24,6 +24,7 @@ class TranscriptChunker:
         overlap_words: int = 50,
         soft_limit_ratio: float = 0.75,
         pause_threshold: float = 2.0,
+        min_chapter_duration: float = 60.0,
     ):
         self.semantic_splitter = SemanticSplitter()
 
@@ -36,32 +37,159 @@ class TranscriptChunker:
 
         self.pause_threshold = pause_threshold
 
+        self.min_chapter_duration = min_chapter_duration
+
         self.cleaner = TranscriptCleaner()
 
-    def chunk(self, segments: List[Segment], video_id: str) -> List[Dict]:
+    def chunk(
+        self,
+        segments: List[Segment],
+        video_id: str,
+        chapters: Optional[List[Dict]] = None,
+        duration: Optional[float] = None,
+    ) -> List[Dict]:
+        """
+        Chunk a transcript into dicts with a "text" key, and always a
+        "title" key.
 
-        if self.version == self.VERSION_BASIC:
+        If `chapters` is given (e.g. real YouTube chapter markers, each
+        a dict with "title" and "start_time"), chunking is scoped to
+        each chapter's segments so section boundaries line up with the
+        video's own structure and every chunk carries the chapter's
+        real title. Chapters shorter than `min_chapter_duration` are
+        merged into the following chapter first, so content-free
+        intros/outros don't waste an LLM call on their own.
 
-            units = self.prepare_segments(segments)
+        If a chapter is long enough to still exceed max_words, it is
+        split further using the normal word-limit/overlap logic below,
+        and the resulting parts are titled "<Chapter Title> (Part N)".
 
-        elif self.version == self.VERSION_SOFT_LIMIT:
+        If `chapters` is not given (or empty), falls back to the
+        original whole-transcript chunking behavior with no title key
+        set — callers are expected to derive a fallback title
+        themselves in that case (see Summarizer._chunk_title).
+        """
 
-            units = self.merge_into_sentences(segments)
+        if chapters:
+            return self._chunk_with_chapters(segments, video_id, chapters, duration)
 
-        elif self.version == self.VERSION_SEMANTIC:
-
-            sentences = self.merge_into_sentences(segments)
-
-            semantic_groups = self.semantic_splitter.split(sentences)
-
-            units = [self.merge_group(group) for group in semantic_groups]
-
-            units = self.merge_into_sentences(segments)
-
-        else:
-            raise ValueError(f"Unknown version {self.version}")
+        units = self._build_units(segments)
 
         return self.chunk_units(units, video_id)
+
+    # --------------------------------------------------
+    # Chapter-aware chunking
+    # --------------------------------------------------
+
+    def _merge_short_chapters(
+        self,
+        chapters: List[Dict],
+        duration: float,
+    ) -> List[tuple]:
+        """
+        Returns a list of (start, end, title) windows, merging any
+        chapter shorter than self.min_chapter_duration forward into
+        the following chapter(s) until the merged window is long
+        enough (or there's nothing left to merge into).
+
+        The merged window's title is taken from whichever absorbed
+        sub-chapter had the longest individual span, not simply the
+        first one — a short "Quick aside" merged into a much longer
+        "How Decorators Work" chapter should end up titled after the
+        substantial content, not the filler that triggered the merge.
+        """
+
+        boundaries = [
+            (float(c["start_time"]), c.get("title", "Untitled")) for c in chapters
+        ]
+        boundaries.append((duration, None))
+
+        n = len(boundaries)
+        windows = []
+        i = 0
+
+        while i < n - 1:
+
+            window_start = boundaries[i][0]
+            end = boundaries[i + 1][0]
+
+            candidates = [(end - window_start, boundaries[i][1])]
+
+            while (end - window_start) < self.min_chapter_duration and i + 2 < n:
+                i += 1
+                end = boundaries[i + 1][0]
+                span = end - boundaries[i][0]
+                candidates.append((span, boundaries[i][1]))
+
+            best_title = max(candidates, key=lambda c: c[0])[1]
+            windows.append((window_start, end, best_title))
+            i += 1
+
+        return windows
+
+    def _build_units(self, segments: List[Segment]) -> List[Dict]:
+        """
+        Runs the configured version's unit-building logic (sentence
+        merging, semantic grouping, etc) over a set of segments. Shared
+        by both the chapter-scoped path and the whole-transcript path
+        so chapters get the exact same quality of sentence/semantic
+        boundaries as before, just scoped to a smaller window.
+        """
+
+        if self.version == self.VERSION_BASIC:
+            return self.prepare_segments(segments)
+
+        if self.version == self.VERSION_SOFT_LIMIT:
+            return self.merge_into_sentences(segments)
+
+        if self.version == self.VERSION_SEMANTIC:
+            sentences = self.merge_into_sentences(segments)
+            semantic_groups = self.semantic_splitter.split(sentences)
+            return [self.merge_group(group) for group in semantic_groups]
+
+        raise ValueError(f"Unknown version {self.version}")
+
+    def _chunk_with_chapters(
+        self,
+        segments: List[Segment],
+        video_id: str,
+        chapters: List[Dict],
+        duration: Optional[float],
+    ) -> List[Dict]:
+
+        if duration is None:
+            duration = max(
+                (s.start + s.duration for s in segments),
+                default=0.0,
+            )
+
+        windows = self._merge_short_chapters(chapters, duration)
+
+        all_chunks: List[Dict] = []
+        chunk_id = 0
+
+        for start, end, title in windows:
+
+            chapter_segments = [s for s in segments if start <= s.start < end]
+
+            if not chapter_segments:
+                continue
+
+            units = self._build_units(chapter_segments)
+
+            chapter_chunks = self.chunk_units(units, video_id)
+
+            multi_part = len(chapter_chunks) > 1
+
+            for part_index, ch in enumerate(chapter_chunks):
+                ch["chunk_id"] = chunk_id
+                ch["title"] = (
+                    f"{title} (Part {part_index + 1})" if multi_part else title
+                )
+                all_chunks.append(ch)
+                chunk_id += 1
+
+        return all_chunks
 
     # --------------------------------------------------
     # Clean Whisper output

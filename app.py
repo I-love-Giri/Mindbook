@@ -1,4 +1,5 @@
 from pathlib import Path
+import streamlit as st
 
 from config.prompts.services.prompt_manager import PromptManager
 from config.prompts.services.prompt_registry import PromptRegistry
@@ -13,19 +14,26 @@ from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 
 from pipeline.embeddings.embedder import EmbeddingService
-
 from pipeline.rag.context_builder import ContextBuilder
 from pipeline.rag.generator import Generator
-
 from pipeline.retrieval.retriever import Retriever
-
 from pipeline.vectorstore.qdrant_store import QdrantStore
+
+# --------------------------------------------------
+# Streamlit Config
+# --------------------------------------------------
+
+st.set_page_config(page_title="YouTube Summarizer", layout="wide")
+
+st.title("🎥 YouTube Video Summarizer")
+
 
 # --------------------------------------------------
 # Dependency Container
 # --------------------------------------------------
 
 
+@st.cache_resource
 def get_services():
 
     prompt_manager = PromptManager(base_path=(Path(__file__).parent / "config/prompts"))
@@ -43,10 +51,7 @@ def get_services():
 
     store = QdrantStore()
 
-    retriever = Retriever(
-        embedding_service,
-        store,
-    )
+    retriever = Retriever(embedding_service, store)
 
     generator = Generator()
 
@@ -59,158 +64,196 @@ def get_services():
     }
 
 
+services = get_services()
+
+
+# --------------------------------------------------
+# Session State
+# --------------------------------------------------
+
+if "summary" not in st.session_state:
+    st.session_state.summary = None
+
+if "classification" not in st.session_state:
+    st.session_state.classification = None
+
+if "key_concepts" not in st.session_state:
+    st.session_state.key_concepts = None
+
+if "grounding" not in st.session_state:
+    st.session_state.grounding = None
+
+if "retriever" not in st.session_state:
+    st.session_state.retriever = None
+
+if "generator" not in st.session_state:
+    st.session_state.generator = None
+
+
+# --------------------------------------------------
+# Input
+# --------------------------------------------------
+
+url = st.text_input("Enter YouTube URL")
+
+
 # --------------------------------------------------
 # Generate Summary
 # --------------------------------------------------
 
-
-def generate_summary(url, services):
+if st.button("Generate Summary"):
 
     if not url:
-        raise ValueError("YouTube URL is required.")
+        st.warning("Please enter a YouTube URL.")
+        st.stop()
 
-    # -------------------------
-    # Load Transcript
-    # -------------------------
+    with st.spinner("Loading transcript..."):
 
-    video_id = extract_video_id(url)
+        video_id = extract_video_id(url)
 
-    transcript_service = TranscriptService()
+        transcript_service = TranscriptService()
 
-    transcript = transcript_service.get(video_id)
-
-    # -------------------------
-    # Load Existing Summary
-    # -------------------------
+        transcript = transcript_service.get(video_id)
 
     if transcript.summary:
 
-        return {
-            "summary": transcript.summary,
-            "classification": transcript.classification,
-            "retriever": services["retriever"],
-            "generator": services["generator"],
-        }
+        summary = transcript.summary
+        classification = transcript.classification
+        key_concepts = getattr(transcript, "key_concepts", None)
+        grounding = getattr(transcript, "grounding", None)
+
+        st.success("Loaded summary from database.")
+
+    else:
+
+        with st.spinner("Processing video..."):
+
+            # -------------------------
+            # Chunk transcript
+            # -------------------------
+
+            chunker = TranscriptChunker(3)
+
+            chunks = chunker.chunk(
+                transcript.segments,
+                transcript.video_id,
+            )
+
+            # -------------------------
+            # Vector Store
+            # -------------------------
+
+            embedding_service = services["embedding"]
+
+            vectors = embedding_service.embed_chunks(chunks)
+
+            store = services["store"]
+
+            store.delete_collection()
+
+            store.upsert(chunks, vectors)
+
+        with st.spinner("Generating deep summary..."):
+
+            # -------------------------
+            # Deep Summarization Pipeline
+            # -------------------------
+            # Runs: chunk_summary -> domain_classifier ->
+            # section_analysis -> key_concepts ->
+            # chapter_summary (hierarchical) -> video_summary ->
+            # grounding_checker
+
+            summarizer = services["summarizer"]
+
+            result = summarizer.summarize(chunks)
+
+            summary = result["summary"]
+            classification = result["classification"]
+            key_concepts = result["key_concepts"]
+            grounding = result["grounding"]
+
+            transcript.summary = summary
+            transcript.classification = classification
+            transcript.key_concepts = key_concepts
+            transcript.grounding = grounding
+
+            transcript_service.save(transcript)
 
     # -------------------------
-    # Chunk Transcript
+    # Session storage
     # -------------------------
 
-    chunker = TranscriptChunker(3)
-
-    chunks = chunker.chunk(
-        transcript.segments,
-        transcript.video_id,
-    )
-
-    # -------------------------
-    # Vector Store
-    # -------------------------
-
-    embedding_service = services["embedding"]
-
-    vectors = embedding_service.embed_chunks(chunks)
-
-    store = services["store"]
-
-    store.delete_collection()
-
-    store.upsert(
-        chunks,
-        vectors,
-    )
-
-    # -------------------------
-    # Summarization
-    # -------------------------
-
-    summarizer = services["summarizer"]
-
-    summary = summarizer.summarize(chunks)
-
-    classification = summarizer.classify_summary(summary)
-
-    # -------------------------
-    # Save Result
-    # -------------------------
-
-    transcript.summary = summary
-
-    transcript.classification = classification
-
-    transcript_service.save(transcript)
-
-    return {
-        "summary": summary,
-        "classification": classification,
-        "retriever": services["retriever"],
-        "generator": services["generator"],
-    }
+    st.session_state.summary = summary
+    st.session_state.classification = classification
+    st.session_state.key_concepts = key_concepts
+    st.session_state.grounding = grounding
+    st.session_state.retriever = services["retriever"]
+    st.session_state.generator = services["generator"]
 
 
 # --------------------------------------------------
-# Question Answering
+# Display Summary
 # --------------------------------------------------
 
+if st.session_state.summary:
 
-def ask_question(query, retriever, generator):
+    st.subheader("📝 Summary")
+    st.json(st.session_state.summary)
 
-    if not query.strip():
-        raise ValueError("Question cannot be empty.")
+    st.subheader("🏷️ Classification")
+    st.json(st.session_state.classification)
 
-    results = retriever.retrieve(
-        query,
-        limit=5,
-    )
+    if st.session_state.key_concepts:
+        st.subheader("🔑 Key Concepts")
+        st.json(st.session_state.key_concepts)
 
-    context_builder = ContextBuilder()
+    if st.session_state.grounding:
+        grounding = st.session_state.grounding
+        verdict = grounding.get("verdict")
 
-    context = context_builder.build(results)
+        with st.expander("✅ Grounding Check", expanded=(verdict == "fail")):
 
-    answer = generator.generate(
-        query,
-        context,
-    )
+            if verdict == "fail":
+                st.warning(
+                    "Some parts of the summary may not be fully "
+                    "supported by the transcript."
+                )
 
-    return answer
+            st.json(grounding)
 
+    st.divider()
 
-# --------------------------------------------------
-# CLI Execution Example
-# --------------------------------------------------
+    st.subheader("💬 Ask Questions About The Video")
 
-if __name__ == "__main__":
+    query = st.text_input("Ask a question", key="question_input")
 
-    services = get_services()
+    if st.button("Get Answer"):
 
-    youtube_url = input("Enter YouTube URL: ")
+        if query.strip():
 
-    result = generate_summary(
-        youtube_url,
-        services,
-    )
+            with st.spinner("Generating answer..."):
 
-    print("\nSummary:")
-    print(result["summary"])
+                retriever = st.session_state.retriever
 
-    print("\nClassification:")
-    print(result["classification"])
+                results = retriever.retrieve(
+                    query,
+                    limit=5,
+                )
 
-    while True:
+                context_builder = ContextBuilder()
 
-        question = input("\nAsk a question (or type exit): ")
+                context = context_builder.build(results)
 
-        if question.lower() == "exit":
-            break
+                answer = st.session_state.generator.generate(
+                    query,
+                    context,
+                )
 
-        answer = ask_question(
-            question,
-            result["retriever"],
-            result["generator"],
-        )
+            st.markdown("### Answer")
+            st.write(answer)
 
-        print("\nAnswer:")
-        print(answer)
+        else:
+            st.warning("Please enter a question.")
 
     # st.subheader("🏷 Classification")
     # st.success(classification)

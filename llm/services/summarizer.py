@@ -1,155 +1,260 @@
 import json
-import time
 import logging
-
-from string import Template
+import time
 from typing import Any
 
-from config.prompts.services.prompt_manager import PromptManager
 from config.prompts.services.prompt_registry import PromptRegistry
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_DOMAIN = "narrative"
+DEFAULT_DIFFICULTY = "intermediate"
+
+# How many words of a chunk's text to use as a fallback title when no
+# real chapter title is available (see _chunk_title).
+FALLBACK_TITLE_WORDS = 7
+
+
+def _chunk_text(chunk: Any) -> str:
+    """
+    Normalizes a chunk into plain text.
+
+    TranscriptChunker (pipeline/chunking/chunker.py) always returns
+    chunks as dicts with a "text" key (see create_chunk and
+    split_long_unit). Plain strings are also accepted so this stays
+    compatible with any simpler chunker used in tests or elsewhere.
+    """
+
+    if isinstance(chunk, str):
+        return chunk
+
+    if isinstance(chunk, dict):
+        text = chunk.get("text")
+        if isinstance(text, str):
+            return text
+        raise TypeError(f"Chunk dict has no 'text' field: {list(chunk.keys())}")
+
+    raise TypeError(f"Unsupported chunk type: {type(chunk)!r}")
+
+
+def _chunk_title(chunk: Any, index: int) -> str:
+    """
+    Extracts a section title from a chunk.
+
+    If the chunker produced a real title (e.g. from a video chapter),
+    use it as-is. Otherwise fall back to a short heuristic title built
+    from the chunk's own first words, so every section still gets a
+    readable heading instead of a generic "Section N".
+    """
+
+    if isinstance(chunk, dict):
+        title = chunk.get("title")
+        if isinstance(title, str) and title.strip():
+            return title.strip()
+
+    text = _chunk_text(chunk)
+    words = text.split()[:FALLBACK_TITLE_WORDS]
+
+    if not words:
+        return f"Section {index + 1}"
+
+    fallback = " ".join(words)
+    if len(text.split()) > FALLBACK_TITLE_WORDS:
+        fallback += "..."
+
+    return fallback.strip().capitalize()
+
+
+def _chunk_start(chunk: Any) -> float:
+    if isinstance(chunk, dict):
+        start = chunk.get("start")
+        if isinstance(start, (int, float)):
+            return float(start)
+    return 0.0
+
 
 class Summarizer:
+    """
+    Deep summarization pipeline.
+
+    Stages:
+      1. Quick per-chunk summaries        (summary/chunk_summary)
+      2. Domain + difficulty classification (classification/domain_classifier)
+      3. Deep, domain-adaptive section pass (summary/section_analysis_<category>)
+      4. Key concept extraction           (extraction/key_concepts)
+      5. Hierarchical chapter merge       (summary/chapter_summary)
+      6. Final citation-aware synthesis   (summary/video_summary_<category>)
+      7. Grounding check                  (validation/grounding_checker)
+
+    Every LLM call uses the educator persona (system/educator) as the
+    system prompt. No vision/frame extraction is used anywhere in this
+    pipeline - every stage works from transcript text only.
+    """
 
     def __init__(
         self,
-        llm,
+        llm: LLMService,
         prompts: PromptRegistry,
+        batch_size: int = 5,
     ):
-
         self.llm = llm
         self.prompts = prompts
+        self.batch_size = batch_size
 
+        # These are category-independent, safe to preload once.
         self.chunk_summary_prompt = prompts.chunk_summary()
-
+        self.key_concepts_prompt = prompts.key_concepts()
         self.chapter_summary_prompt = prompts.chapter_summary()
-
-        self.video_summary_prompt = prompts.video_summary()
-
         self.domain_classifier_prompt = prompts.domain_classifier()
+        self.grounding_checker_prompt = prompts.grounding_checker()
+
+        # These depend on the classified category and are loaded per
+        # run inside summarize(), once the category is known.
+        self._section_analysis_prompt = None
+        self._video_summary_prompt = None
+
+        self.educator_system_prompt = prompts.educator_system()
 
     # --------------------------------------------------
     # Prompt Builders
     # --------------------------------------------------
 
-    def _build_chunk_prompt(
+    def _build_chunk_summary_prompt(self, transcript: str) -> str:
+        return self.chunk_summary_prompt.substitute(transcript=transcript)
+
+    def _build_section_analysis_prompt(
         self,
         transcript: str,
+        domain: str,
+        difficulty: str,
+        section_title: str,
     ) -> str:
+        return self._section_analysis_prompt.substitute(
+            transcript=transcript,
+            domain=domain,
+            difficulty=difficulty,
+            section_title=section_title,
+        )
 
-        return self.chunk_summary_prompt.substitute(transcript=transcript)
+    def _build_key_concepts_prompt(self, transcript: str) -> str:
+        return self.key_concepts_prompt.substitute(transcript=transcript)
 
     def _build_chapter_prompt(
         self,
-        summaries: list[dict[str, Any]],
+        sections: list[dict[str, Any]],
     ) -> str:
-
         return self.chapter_summary_prompt.substitute(
-            sections=json.dumps(
-                summaries,
-                ensure_ascii=False,
-                indent=2,
-            )
+            sections=json.dumps(sections, ensure_ascii=False, indent=2)
         )
 
     def _build_video_prompt(
         self,
         chapter_summary: dict[str, Any],
+        indexed_sections: list[dict[str, Any]],
     ) -> str:
-
-        return self.video_summary_prompt.substitute(
-            chapters=json.dumps(
-                chapter_summary,
-                ensure_ascii=False,
-                indent=2,
-            )
+        return self._video_summary_prompt.substitute(
+            chapters=json.dumps(chapter_summary, ensure_ascii=False, indent=2),
+            sections=json.dumps(indexed_sections, ensure_ascii=False, indent=2),
         )
 
     def _build_classifier_prompt(
         self,
         summary: dict[str, Any],
     ) -> str:
-
         return self.domain_classifier_prompt.substitute(
-            summary=json.dumps(
-                summary,
-                ensure_ascii=False,
-                indent=2,
-            )
+            summary=json.dumps(summary, ensure_ascii=False, indent=2)
+        )
+
+    def _build_grounding_prompt(
+        self,
+        transcript: str,
+        summary: dict[str, Any],
+    ) -> str:
+        return self.grounding_checker_prompt.substitute(
+            transcript=transcript,
+            summary=json.dumps(summary, ensure_ascii=False, indent=2),
         )
 
     # --------------------------------------------------
-    # Chunk Summary
+    # LLM Call Wrapper
     # --------------------------------------------------
 
-    def summarize_chunk(
-        self,
-        chunk: str,
-    ) -> dict[str, Any]:
-
-        start = time.perf_counter()
-
-        prompt = self._build_chunk_prompt(chunk)
-
-        result = self.llm.generate(
+    def _call(self, prompt: str) -> dict[str, Any]:
+        return self.llm.generate(
             prompt,
+            system_prompt=self.educator_system_prompt,
             json_output=True,
         )
 
+    # --------------------------------------------------
+    # Stage 1: Quick Chunk Summary
+    # --------------------------------------------------
+
+    def summarize_chunk(self, chunk: str) -> dict[str, Any]:
+        start = time.perf_counter()
+
+        prompt = self._build_chunk_summary_prompt(chunk)
+        result = self._call(prompt)
+
         logger.info(
-            "Chunk summarized in %.2fs",
+            "Quick chunk summary done in %.2fs",
             time.perf_counter() - start,
         )
 
         return result
 
     # --------------------------------------------------
-    # Domain Classification
+    # Stage 2: Domain + Difficulty Classification
     # --------------------------------------------------
 
-    def classify_summary(
+    def classify_domain(
         self,
-        summary: dict[str, Any],
+        chunk_summaries: list[dict[str, Any]],
     ) -> dict[str, Any]:
-
-        prompt = self._build_classifier_prompt(summary)
-
-        return self.llm.generate(
-            prompt,
-            json_output=True,
-        )
+        prompt = self._build_classifier_prompt({"chunk_summaries": chunk_summaries})
+        return self._call(prompt)
 
     # --------------------------------------------------
-    # Chapter Merge
+    # Stage 3: Deep, Domain-Adaptive Section Analysis
+    # --------------------------------------------------
+
+    def analyze_section(
+        self,
+        chunk_text: str,
+        domain: str,
+        difficulty: str,
+        section_title: str,
+    ) -> dict[str, Any]:
+        prompt = self._build_section_analysis_prompt(
+            chunk_text, domain, difficulty, section_title
+        )
+        return self._call(prompt)
+
+    # --------------------------------------------------
+    # Stage 4: Key Concept Extraction
+    # --------------------------------------------------
+
+    def extract_key_concepts(self, transcript: str) -> dict[str, Any]:
+        prompt = self._build_key_concepts_prompt(transcript)
+        return self._call(prompt)
+
+    # --------------------------------------------------
+    # Stage 5: Hierarchical Chapter Merge
     # --------------------------------------------------
 
     def merge_summaries(
         self,
         summaries: list[dict[str, Any]],
     ) -> dict[str, Any]:
-
         prompt = self._build_chapter_prompt(summaries)
-
-        return self.llm.generate(
-            prompt,
-            json_output=True,
-        )
-
-    # --------------------------------------------------
-    # Hierarchical Merge
-    # --------------------------------------------------
+        return self._call(prompt)
 
     def hierarchical_merge(
         self,
         summaries: list[dict[str, Any]],
-        batch_size: int = 5,
     ) -> dict[str, Any]:
-
         level = summaries
-
         round_number = 1
 
         while len(level) > 1:
@@ -162,109 +267,214 @@ class Summarizer:
 
             next_level = []
 
-            for i in range(
-                0,
-                len(level),
-                batch_size,
-            ):
-
-                batch = level[i : i + batch_size]
-
+            for i in range(0, len(level), self.batch_size):
+                batch = level[i : i + self.batch_size]
                 merged = self.merge_summaries(batch)
-
                 next_level.append(merged)
 
             level = next_level
-
             round_number += 1
 
         return level[0]
 
     # --------------------------------------------------
-    # Final Video Summary
+    # Stage 6: Final Citation-Aware Synthesis
     # --------------------------------------------------
 
     def create_video_summary(
         self,
         chapter_summary: dict[str, Any],
+        indexed_sections: list[dict[str, Any]],
     ) -> dict[str, Any]:
+        prompt = self._build_video_prompt(chapter_summary, indexed_sections)
+        return self._call(prompt)
 
-        prompt = self._build_video_prompt(chapter_summary)
+    # --------------------------------------------------
+    # Stage 7: Grounding Check
+    # --------------------------------------------------
 
-        return self.llm.generate(
-            prompt,
-            json_output=True,
-        )
+    def check_grounding(
+        self,
+        transcript: str,
+        summary: dict[str, Any],
+    ) -> dict[str, Any]:
+        prompt = self._build_grounding_prompt(transcript, summary)
+        return self._call(prompt)
 
     # --------------------------------------------------
     # Main Pipeline
     # --------------------------------------------------
 
-    def summarize(
-        self,
-        chunks: list[str],
-    ) -> dict[str, Any]:
+    def summarize(self, chunks: list[Any]) -> dict[str, Any]:
+        """
+        Runs the full deep-summary pipeline and returns:
+
+        {
+            "summary": {...},         # video_summary_<category> schema
+            "sections": [...],        # per-chunk deep section analyses
+            "classification": {...},  # domain_classifier schema
+            "key_concepts": [...],
+            "grounding": {...},       # grounding_checker schema
+        }
+        """
 
         if not chunks:
-
             logger.warning("No transcript chunks received.")
-
             return {}
 
         pipeline_start = time.perf_counter()
 
         logger.info(
-            "Starting summarization | chunks=%d",
+            "Starting deep summarization | chunks=%d",
             len(chunks),
         )
 
-        chunk_summaries = []
+        chunk_texts = [_chunk_text(chunk) for chunk in chunks]
+        chunk_titles = [_chunk_title(chunk, i) for i, chunk in enumerate(chunks)]
+        chunk_starts = [_chunk_start(chunk) for chunk in chunks]
 
-        # Step 1:
-        # Summarize every transcript chunk
+        full_transcript = "\n\n".join(chunk_texts)
 
-        for index, chunk in enumerate(chunks):
+        # Step 1: quick per-chunk summaries (fast first pass)
+        chunk_summaries: list[dict[str, Any]] = []
 
+        for index, chunk_text in enumerate(chunk_texts):
             try:
-
-                summary = self.summarize_chunk(chunk)
-
+                summary = self.summarize_chunk(chunk_text)
                 chunk_summaries.append(summary)
 
                 logger.info(
-                    "Completed chunk %d/%d",
+                    "Completed quick summary %d/%d",
                     index + 1,
                     len(chunks),
                 )
 
             except Exception:
-
                 logger.exception(
-                    "Failed chunk %d",
+                    "Failed quick summary for chunk %d",
                     index + 1,
                 )
-
                 raise
 
-        # Step 2:
-        # Merge chunk summaries into chapter
+        # Step 2: classify domain + difficulty from the quick summaries,
+        # before running the more expensive domain-adaptive deep pass
+        try:
+            classification = self.classify_domain(chunk_summaries)
+            category = classification.get("category", DEFAULT_DOMAIN)
+            difficulty = classification.get("difficulty", DEFAULT_DIFFICULTY)
 
-        chapter_summary = self.hierarchical_merge(
-            chunk_summaries,
-            batch_size=5,
-        )
-
-        # Step 3:
-        # Generate final learning summary
-
-        final_summary = self.create_video_summary(chapter_summary)
+        except Exception:
+            logger.exception("Domain classification failed, using default")
+            classification = {
+                "category": DEFAULT_DOMAIN,
+                "difficulty": DEFAULT_DIFFICULTY,
+                "confidence": 0.0,
+                "reason": "Classification failed; default applied.",
+            }
+            category = DEFAULT_DOMAIN
+            difficulty = DEFAULT_DIFFICULTY
 
         logger.info(
-            "Total pipeline time %.2fs",
+            "Detected category: %s | difficulty: %s (confidence=%s)",
+            category,
+            difficulty,
+            classification.get("confidence"),
+        )
+
+        # Load the category-specific templates now that we know which
+        # domain we're dealing with.
+        self._section_analysis_prompt = self.prompts.section_analysis(category)
+        self._video_summary_prompt = self.prompts.video_summary(category)
+
+        # Step 3: deep, domain-adaptive analysis per chunk
+        section_analyses: list[dict[str, Any]] = []
+
+        for index, chunk_text in enumerate(chunk_texts):
+            try:
+                analysis = self.analyze_section(
+                    chunk_text,
+                    category,
+                    difficulty,
+                    chunk_titles[index],
+                )
+                analysis["title"] = chunk_titles[index]
+                analysis["start"] = chunk_starts[index]
+
+                section_analyses.append(analysis)
+
+                logger.info(
+                    "Completed deep analysis %d/%d",
+                    index + 1,
+                    len(chunks),
+                )
+
+            except Exception:
+                logger.exception(
+                    "Failed deep analysis for chunk %d",
+                    index + 1,
+                )
+                raise
+
+        # Step 4: extract key concepts from the full transcript
+        try:
+            key_concepts_result = self.extract_key_concepts(full_transcript)
+            key_concepts = key_concepts_result.get("concepts", [])
+
+        except Exception:
+            logger.exception("Key concept extraction failed")
+            key_concepts = []
+
+        # Step 5: hierarchically merge deep section analyses into chapters
+        chapter_summary = self.hierarchical_merge(section_analyses)
+
+        # Build a compact, indexed section list for citation-aware
+        # synthesis (FAQ source_section references, etc). Kept small
+        # and separate from the full section_analyses so the final
+        # synthesis prompt stays bounded even for long videos.
+        indexed_sections = [
+            {
+                "index": i + 1,
+                "title": s.get("title", f"Section {i + 1}"),
+                "start": s.get("start", 0.0),
+                "key_concepts": s.get("key_concepts", []),
+            }
+            for i, s in enumerate(section_analyses)
+        ]
+
+        # Step 6: produce the final connected, citation-aware video summary
+        final_summary = self.create_video_summary(chapter_summary, indexed_sections)
+
+        # Step 7: verify the final summary is grounded in the transcript
+        try:
+            grounding = self.check_grounding(full_transcript, final_summary)
+
+            if not grounding.get("grounded", True):
+                logger.warning(
+                    "Grounding check flagged issues: %s",
+                    grounding.get("issues"),
+                )
+
+        except Exception:
+            logger.exception("Grounding check failed")
+            grounding = {
+                "grounded": None,
+                "confidence": 0.0,
+                "verdict": "unknown",
+                "issues": [],
+            }
+
+        logger.info(
+            "Deep summarization pipeline finished in %.2fs",
             time.perf_counter() - pipeline_start,
         )
 
-        return final_summary
+        return {
+            "summary": final_summary,
+            "sections": section_analyses,
+            "classification": classification,
+            "key_concepts": key_concepts,
+            "grounding": grounding,
+        }
 
         # return final_summary
 

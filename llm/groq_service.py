@@ -1,8 +1,8 @@
 import logging
 import json
+import re
 
 from groq import APIConnectionError, APITimeoutError, Groq, RateLimitError
-
 
 from tenacity import (
     before_sleep_log,
@@ -12,17 +12,94 @@ from tenacity import (
     wait_random_exponential,
 )
 
-
 from config.settings import GROQ_API_KEY, MODEL_NAME
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_SYSTEM_PROMPT = (
+    "You are an expert assistant for summarizing YouTube transcripts."
+)
+
+# Groq rejects response_format={"type": "json_object"} unless the word
+# "json" literally appears somewhere in the messages. We guarantee this
+# in code so it never depends on prompt-file wording.
+JSON_INSTRUCTION = (
+    "Respond only with valid json. Do not include markdown or commentary."
+)
+
+
+def _extract_json(text: str):
+    """
+    Best-effort JSON extraction from an LLM response.
+
+    Groq's response_format=json_object mode is supposed to guarantee
+    clean JSON, but free/small models still occasionally wrap it in
+    markdown fences, add a stray sentence before/after, or leave a
+    trailing comma. This tries, in order:
+
+      1. A direct json.loads() of the cleaned text.
+      2. A depth-tracked scan for the first complete {...} or [...]
+         block, ignoring braces/brackets inside string literals.
+      3. The same block with trailing commas before a closing
+         bracket stripped, in case that's the only defect.
+
+    Returns None if nothing parseable was found.
+    """
+
+    if not text:
+        return None
+
+    cleaned = text.replace("```json", "").replace("```", "").strip()
+
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    for start_char, end_char in (("{", "}"), ("[", "]")):
+        start = cleaned.find(start_char)
+        if start == -1:
+            continue
+
+        depth = 0
+        in_string = False
+        escape = False
+
+        for i, ch in enumerate(cleaned[start:], start):
+            if escape:
+                escape = False
+                continue
+            if ch == "\\" and in_string:
+                escape = True
+                continue
+            if ch == '"' and not escape:
+                in_string = not in_string
+                continue
+            if in_string:
+                continue
+            if ch == start_char:
+                depth += 1
+            elif ch == end_char:
+                depth -= 1
+                if depth == 0:
+                    candidate = cleaned[start : i + 1]
+                    try:
+                        return json.loads(candidate)
+                    except json.JSONDecodeError:
+                        try:
+                            repaired = re.sub(r",\s*([}\]])", r"\1", candidate)
+                            return json.loads(repaired)
+                        except json.JSONDecodeError:
+                            break
+
+    return None
+
 
 class LLMService:
+
     def __init__(self):
         self.client = Groq(
             api_key=GROQ_API_KEY,
-            # max_retries= 3,  # SDK handles transient retries
             timeout=30.0,  # Prevent requests from hanging indefinitely
         )
 
@@ -42,21 +119,23 @@ class LLMService:
     def generate(
         self,
         prompt: str,
+        system_prompt: str | None = None,
         temperature: float = 0.7,
         max_tokens: int = 3000,
         json_output: bool = False,
     ):
+
+        system_content = system_prompt or DEFAULT_SYSTEM_PROMPT
+
+        if json_output:
+            system_content = f"{system_content}\n\n{JSON_INSTRUCTION}"
 
         response = self.client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {
                     "role": "system",
-                    "content": (
-                        "You are an expert assistant "
-                        "for summarizing YouTube transcripts."
-                        "When asked, you respond only with valid json."
-                    ),
+                    "content": system_content,
                 },
                 {
                     "role": "user",
@@ -71,7 +150,16 @@ class LLMService:
         content = response.choices[0].message.content
 
         if json_output:
-            return json.loads(content)
+            result = _extract_json(content)
+
+            if result is None:
+                logger.error(
+                    "LLM returned unparseable JSON even after repair attempts: %s",
+                    content,
+                )
+                raise ValueError("LLM did not return valid JSON.")
+
+            return result
 
         return content
 
