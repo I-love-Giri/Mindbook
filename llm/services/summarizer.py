@@ -168,11 +168,13 @@ class Summarizer:
 
     def _build_grounding_prompt(
         self,
-        transcript: str,
+        reference_content: dict[str, Any],
         summary: dict[str, Any],
     ) -> str:
         return self.grounding_checker_prompt.substitute(
-            transcript=transcript,
+            reference_content=json.dumps(
+                reference_content, ensure_ascii=False, indent=2
+            ),
             summary=json.dumps(summary, ensure_ascii=False, indent=2),
         )
 
@@ -235,9 +237,38 @@ class Summarizer:
     # Stage 4: Key Concept Extraction
     # --------------------------------------------------
 
-    def extract_key_concepts(self, transcript: str) -> dict[str, Any]:
-        prompt = self._build_key_concepts_prompt(transcript)
-        return self._call(prompt)
+    def extract_key_concepts(self, chunk_texts: list[str]) -> list[dict[str, Any]]:
+        """
+        Extracts key concepts per chunk (bounded, same as every other
+        stage) instead of sending the whole transcript in one request -
+        that single-shot approach was blowing past Groq's per-request
+        token budget on anything longer than a few minutes of video.
+        Results are merged and deduplicated by concept name.
+        """
+
+        all_concepts: list[dict[str, Any]] = []
+        seen_names: set[str] = set()
+
+        for index, chunk_text in enumerate(chunk_texts):
+            try:
+                prompt = self._build_key_concepts_prompt(chunk_text)
+                result = self._call(prompt)
+
+                for concept in result.get("concepts", []):
+                    name = concept.get("name", "").strip()
+                    key = name.lower()
+
+                    if name and key not in seen_names:
+                        seen_names.add(key)
+                        all_concepts.append(concept)
+
+            except Exception:
+                logger.exception(
+                    "Key concept extraction failed for chunk %d, skipping",
+                    index + 1,
+                )
+
+        return all_concepts
 
     # --------------------------------------------------
     # Stage 5: Hierarchical Chapter Merge
@@ -295,10 +326,22 @@ class Summarizer:
 
     def check_grounding(
         self,
-        transcript: str,
+        reference_content: dict[str, Any],
         summary: dict[str, Any],
     ) -> dict[str, Any]:
-        prompt = self._build_grounding_prompt(transcript, summary)
+        """
+        Checks the final summary against the condensed chapter_summary
+        it was synthesized from - not the raw transcript. Grounding
+        against the full transcript would be more thorough in theory,
+        but for anything beyond a few minutes of video it single-
+        handedly blew the per-request token budget (this was the
+        actual cause of the 413 "Request too large" errors). Checking
+        against the already-condensed chapter content still catches
+        the failure mode that matters here: the final synthesis step
+        inventing something beyond what the pipeline already
+        established, while staying within a bounded request size.
+        """
+        prompt = self._build_grounding_prompt(reference_content, summary)
         return self._call(prompt)
 
     # --------------------------------------------------
@@ -332,8 +375,6 @@ class Summarizer:
         chunk_texts = [_chunk_text(chunk) for chunk in chunks]
         chunk_titles = [_chunk_title(chunk, i) for i, chunk in enumerate(chunks)]
         chunk_starts = [_chunk_start(chunk) for chunk in chunks]
-
-        full_transcript = "\n\n".join(chunk_texts)
 
         # Step 1: quick per-chunk summaries (fast first pass)
         chunk_summaries: list[dict[str, Any]] = []
@@ -417,8 +458,7 @@ class Summarizer:
 
         # Step 4: extract key concepts from the full transcript
         try:
-            key_concepts_result = self.extract_key_concepts(full_transcript)
-            key_concepts = key_concepts_result.get("concepts", [])
+            key_concepts = self.extract_key_concepts(chunk_texts)
 
         except Exception:
             logger.exception("Key concept extraction failed")
@@ -446,7 +486,7 @@ class Summarizer:
 
         # Step 7: verify the final summary is grounded in the transcript
         try:
-            grounding = self.check_grounding(full_transcript, final_summary)
+            grounding = self.check_grounding(chapter_summary, final_summary)
 
             if not grounding.get("grounded", True):
                 logger.warning(
