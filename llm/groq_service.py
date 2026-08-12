@@ -1,8 +1,13 @@
-import logging
 import json
+import logging
 import re
 
-from groq import APIConnectionError, APITimeoutError, Groq, RateLimitError
+from groq import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncGroq,
+    RateLimitError,
+)
 
 from tenacity import (
     before_sleep_log,
@@ -16,15 +21,11 @@ from config.settings import GROQ_API_KEY, MODEL_NAME
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_SYSTEM_PROMPT = (
-    "You are an expert assistant for summarizing YouTube transcripts."
-)
 
-# Groq rejects response_format={"type": "json_object"} unless the word
-# "json" literally appears somewhere in the messages. We guarantee this
-# in code so it never depends on prompt-file wording.
+DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for analyzing YouTube transcripts."
+
 JSON_INSTRUCTION = (
-    "Respond only with valid json. Do not include markdown or commentary."
+    "Respond only with valid json. " "Do not include markdown or commentary."
 )
 
 
@@ -32,18 +33,10 @@ def _extract_json(text: str):
     """
     Best-effort JSON extraction from an LLM response.
 
-    Groq's response_format=json_object mode is supposed to guarantee
-    clean JSON, but free/small models still occasionally wrap it in
-    markdown fences, add a stray sentence before/after, or leave a
-    trailing comma. This tries, in order:
-
-      1. A direct json.loads() of the cleaned text.
-      2. A depth-tracked scan for the first complete {...} or [...]
-         block, ignoring braces/brackets inside string literals.
-      3. The same block with trailing commas before a closing
-         bracket stripped, in case that's the only defect.
-
-    Returns None if nothing parseable was found.
+    Attempts:
+    1. Direct json.loads()
+    2. Extract first complete JSON object/array
+    3. Remove trailing commas and retry
     """
 
     if not text:
@@ -51,13 +44,17 @@ def _extract_json(text: str):
 
     cleaned = text.replace("```json", "").replace("```", "").strip()
 
+    # First attempt: response is already valid JSON.
     try:
         return json.loads(cleaned)
     except json.JSONDecodeError:
         pass
 
+    # Second attempt: find a JSON object or array inside the response.
     for start_char, end_char in (("{", "}"), ("[", "]")):
+
         start = cleaned.find(start_char)
+
         if start == -1:
             continue
 
@@ -66,28 +63,43 @@ def _extract_json(text: str):
         escape = False
 
         for i, ch in enumerate(cleaned[start:], start):
+
             if escape:
                 escape = False
                 continue
+
             if ch == "\\" and in_string:
                 escape = True
                 continue
+
             if ch == '"' and not escape:
                 in_string = not in_string
                 continue
+
             if in_string:
                 continue
+
             if ch == start_char:
                 depth += 1
+
             elif ch == end_char:
                 depth -= 1
+
                 if depth == 0:
                     candidate = cleaned[start : i + 1]
+
                     try:
                         return json.loads(candidate)
+
                     except json.JSONDecodeError:
+
+                        repaired = re.sub(
+                            r",\s*([}\]])",
+                            r"\1",
+                            candidate,
+                        )
+
                         try:
-                            repaired = re.sub(r",\s*([}\]])", r"\1", candidate)
                             return json.loads(repaired)
                         except json.JSONDecodeError:
                             break
@@ -98,14 +110,17 @@ def _extract_json(text: str):
 class LLMService:
 
     def __init__(self):
-        self.client = Groq(
+        self.client = AsyncGroq(
             api_key=GROQ_API_KEY,
-            timeout=30.0,  # Prevent requests from hanging indefinitely
+            timeout=30.0,
         )
 
     @retry(
         stop=stop_after_attempt(3),
-        wait=wait_random_exponential(multiplier=1, max=10),
+        wait=wait_random_exponential(
+            multiplier=1,
+            max=10,
+        ),
         retry=retry_if_exception_type(
             (
                 APIConnectionError,
@@ -113,10 +128,13 @@ class LLMService:
                 RateLimitError,
             )
         ),
-        before_sleep=before_sleep_log(logger, logging.WARNING),
+        before_sleep=before_sleep_log(
+            logger,
+            logging.WARNING,
+        ),
         reraise=True,
     )
-    def generate(
+    async def generate(
         self,
         prompt: str,
         system_prompt: str | None = None,
@@ -128,9 +146,9 @@ class LLMService:
         system_content = system_prompt or DEFAULT_SYSTEM_PROMPT
 
         if json_output:
-            system_content = f"{system_content}\n\n{JSON_INSTRUCTION}"
+            system_content = f"{system_content}\n\n" f"{JSON_INSTRUCTION}"
 
-        response = self.client.chat.completions.create(
+        response = await self.client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
                 {
@@ -149,19 +167,24 @@ class LLMService:
 
         content = response.choices[0].message.content
 
+        if not content:
+            raise ValueError("LLM returned an empty response.")
+
         if json_output:
+
             result = _extract_json(content)
 
             if result is None:
                 logger.error(
-                    "LLM returned unparseable JSON even after repair attempts: %s",
+                    "LLM returned unparseable JSON: %s",
                     content,
                 )
+
                 raise ValueError("LLM did not return valid JSON.")
 
             return result
 
-        return content
+        return content.strip()
 
     """
 
