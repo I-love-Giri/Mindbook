@@ -1,6 +1,11 @@
 import json
 import logging
 from typing import Any
+import asyncio
+from llm.groq_service import LLMService
+from video_processor.services.parser import extract_video_id
+from video_processor.services.video_info import extract_chapters_and_info
+from video_processor.services.youtube_service import YoutubeTranscriptService
 
 logger = logging.getLogger(__name__)
 
@@ -66,76 +71,62 @@ def _sanitize_mermaid(mermaid: str) -> str:
 async def layer2_content_parse(
     transcript,
     video_info: dict,
-    api_key: str,
+    llm_service: LLMService,
 ) -> dict:
     """
-    Analyze a YouTube transcript and video metadata using an LLM.
+    Extract structured semantic metadata from a YouTube video.
 
-    `transcript` is the Transcript object returned by
-    YoutubeTranscriptService.fetch_transcript().
+    Uses:
+        transcript:
+            Transcript object returned by YoutubeTranscriptService.
 
-    `video_info` is the dictionary returned by
-    extract_chapters_and_info().
+        video_info:
+            Metadata returned by extract_chapters_and_info().
 
-    Extracts:
-        - content type
-        - difficulty
-        - domain
-        - overall topic
-        - prerequisites
-        - key entities
-        - inferred topics/sections
-        - learning objectives
-        - knowledge graph in Mermaid format
+        llm_service:
+            LLMService instance responsible for the actual LLM call.
     """
 
-    # ---------------------------------------------------------
-    # 1. Get transcript segments
-    # ---------------------------------------------------------
-
     segments = transcript.segments
-
     n = len(segments)
 
     # ---------------------------------------------------------
-    # 2. Sample transcript intelligently
-    # ---------------------------------------------------------
-    #
-    # For short videos:
-    #     use everything
-    #
-    # For long videos:
-    #     beginning + middle + end
-    #
-    # This prevents sending an enormous transcript to the LLM.
+    # Select transcript sample
     # ---------------------------------------------------------
 
     if n <= 300:
         sample_segments = segments
+
     else:
         head = segments[:100]
 
-        middle_start = max(0, n // 2 - 50)
-        middle_end = min(n, n // 2 + 50)
+        mid_start = max(0, n // 2 - 50)
+        mid_end = min(n, n // 2 + 50)
 
-        mid = segments[middle_start:middle_end]
-
+        mid = segments[mid_start:mid_end]
         tail = segments[-100:]
 
         sample_segments = head + mid + tail
 
-    sample = " ".join(segment.text for segment in sample_segments if segment.text)
+    # ---------------------------------------------------------
+    # Preserve timestamps
+    # ---------------------------------------------------------
 
-    # Keep prompt size under control.
+    sample = "\n".join(
+        f"[{segment.start:.1f}s] {segment.text}"
+        for segment in sample_segments
+        if segment.text
+    )
+
     sample = sample[:5000]
 
     # ---------------------------------------------------------
-    # 3. Build chapter information
+    # Chapters
     # ---------------------------------------------------------
 
-    chapters_text = ""
-
     chapters = video_info.get("chapters") or []
+
+    chapters_text = ""
 
     if chapters:
         chapters_text = "CHAPTERS:\n" + "\n".join(
@@ -144,17 +135,24 @@ async def layer2_content_parse(
         )
 
     # ---------------------------------------------------------
-    # 4. Build LLM prompt
+    # Video metadata
     # ---------------------------------------------------------
 
     title = video_info.get("title") or "Unknown"
     duration = video_info.get("duration") or 0
 
+    # ---------------------------------------------------------
+    # Prompt
+    # ---------------------------------------------------------
+
     prompt = f"""
 Analyze this YouTube video transcript carefully.
 
-VIDEO: "{title}"
-DURATION: {duration:.0f}s
+VIDEO:
+"{title}"
+
+DURATION:
+{duration:.0f} seconds
 
 {chapters_text}
 
@@ -163,82 +161,100 @@ TRANSCRIPT SAMPLE:
 
 Extract structured metadata.
 
-Return ONLY valid JSON. Do not use markdown.
-Do not wrap the JSON in ```json fences.
-
-The JSON must have exactly this structure:
+Return a JSON object with exactly these fields:
 
 {{
-  "content_type": "tutorial|lecture|demo|review|vlog|interview|course|documentary|analysis|explainer|news|debate",
-  "difficulty": "beginner|intermediate|advanced",
+    "content_type": "tutorial|lecture|demo|review|vlog|interview|course|documentary|analysis|explainer|news|debate",
 
-  "domain": "Main knowledge domain. Be specific and accurate.",
+    "difficulty": "beginner|intermediate|advanced",
 
-  "overall_topic": "One precise sentence describing what this video is actually about.",
+    "domain": "Main knowledge domain. Be specific.",
 
-  "prerequisites": [
-    "knowledge or concept the viewer should already understand"
-  ],
+    "overall_topic": "One precise sentence describing what this video is about.",
 
-  "key_entities": [
-    {{
-      "name": "entity name",
-      "type": "concept|tool|person|place|country|organization|event|policy|law|movement|ideology|algorithm|library|framework",
-      "importance": 1
-    }}
-  ],
+    "prerequisites": [
+        "knowledge required before understanding this video"
+    ],
 
-  "topics": [
-    {{
-      "title": "Topic or section title",
-      "start_approx": 0,
-      "summary": "1-2 sentence summary of this section"
-    }}
-  ],
+    "key_entities": [
+        {{
+            "name": "entity name",
+            "type": "concept|tool|person|place|country|organization|event|policy|law|movement|ideology|algorithm|library|framework",
+            "importance": importance must be an integer from 1 to 5
+        }}
+    ],
 
-  "learning_objectives": [
-    "After watching this, viewers will understand..."
-  ],
+    "topics": [
+        {{
+            "title": "Topic title",
+            "start_approx": 0,
+            "summary": "1-2 sentence summary"
+        }}
+    ],
 
-  "knowledge_graph_mermaid": "graph TD\\n A[concept] --> B[concept]"
+    "learning_objectives": [
+        "After watching this, viewers will understand..."
+    ],
+
+    "knowledge_graph_mermaid": "graph TD\\n A[concept] --> B[concept]"
 }}
 
 Rules:
 
-1. Only include entities that are actually supported by the transcript.
-2. Do not hallucinate people, organizations, technologies, events, or concepts.
-3. Use the chapter timestamps when they provide useful section boundaries.
-4. If chapters are unavailable, infer approximate topic timestamps from the transcript.
-5. Keep topics meaningful rather than creating a topic for every small subject change.
-6. Keep the number of key entities reasonable.
-7. The knowledge graph should contain the most important concepts and relationships.
-8. Return raw JSON only.
+- Only include information supported by the transcript.
+- Do not hallucinate entities.
+- Use chapter timestamps when available.
+- If chapters are unavailable, infer approximate timestamps
+  using transcript timestamps.
+- Identify meaningful sections rather than tiny topic changes.
+- Keep the knowledge graph focused on the most important concepts.
+
+
+Entity Entity importance must be scored from 1 to 5:
+   - 5 = central to the video's subject
+   - 4 = very important
+   - 3 = moderately important
+   - 2 = minor supporting entity
+   - 1 = briefly mentioned
+
+- Only include entities that are actually supported by the transcript.
+- Do not create entities merely because they are implied.
+
+PREREQUISITE RULES:
+
+- Only include knowledge genuinely necessary to understand the video.
+- Do not include generic or optional background knowledge.
+- Return an empty list if no prerequisites are necessary.
+
+Return valid JSON only.
+
+
+
 """
 
     # ---------------------------------------------------------
-    # 5. Call your existing LLM helper
+    # LLM call
     # ---------------------------------------------------------
 
-    raw = await call_text(
-        [{"role": "user", "content": prompt}],
-        api_key,
+    result = await llm_service.generate(
+        prompt=prompt,
         max_tokens=1500,
-        fast=False,
+        temperature=0.2,
+        json_output=True,
     )
 
     # ---------------------------------------------------------
-    # 6. Parse response
+    # Sanitize Mermaid
     # ---------------------------------------------------------
 
-    result = _extract_json(raw)
+    result["knowledge_graph_mermaid"] = _sanitize_mermaid(
+        result.get("knowledge_graph_mermaid", "")
+    )
 
-    if isinstance(result, dict) and result:
-        result["knowledge_graph_mermaid"] = _sanitize_mermaid(
-            result.get("knowledge_graph_mermaid", "")
-        )
+    return result
 
-        return result
 
+"""
     # ---------------------------------------------------------
     # 7. Safe fallback
     # ---------------------------------------------------------
@@ -254,3 +270,33 @@ Rules:
         "learning_objectives": [],
         "knowledge_graph_mermaid": "",
     }
+"""
+
+if __name__ == "__main__":
+
+    url = input("Enter the URL: ").strip()
+
+    if not url:
+        print("URL cannot be empty")
+        exit(1)
+
+    id = extract_video_id(url)
+    print(f"Video ID: {id}")
+
+    llm_service = LLMService()
+
+    transcript_service = YoutubeTranscriptService()
+
+    transcript = transcript_service.fetch_transcript(id)
+
+    video_info = extract_chapters_and_info(id)
+
+    layer2_result = asyncio.run(
+        layer2_content_parse(
+            transcript=transcript,
+            video_info=video_info,
+            llm_service=llm_service,
+        )
+    )
+
+    print(json.dumps(layer2_result, indent=2))
