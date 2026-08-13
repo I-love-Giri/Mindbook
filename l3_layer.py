@@ -51,30 +51,6 @@ def _extract_json(raw: str) -> dict:
     return {}
 
 
-def _sanitize_mermaid(mermaid: str) -> str:
-    """
-    Basic cleanup for Mermaid output.
-    """
-
-    if not mermaid:
-        return ""
-
-    mermaid = mermaid.strip()
-
-    if mermaid.startswith("```"):
-        lines = mermaid.splitlines()
-
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-
-        mermaid = "\n".join(lines).strip()
-
-    return mermaid
-
-
 def build_mermaid(nodes: list, edges: list) -> str:
     """
     Build Mermaid graph from structured nodes and edges.
@@ -291,277 +267,180 @@ async def layer3_knowledge_graph(
     # ---------------------------------------------------------
 
     prompt = f"""
-You are building a knowledge graph for a YouTube video.
+        You are building a knowledge graph for a YouTube video.
 
-VIDEO:
-"{video_info.get('title', '')}"
+        VIDEO:
+        "{video_info.get('title', '')}"
 
-DOMAIN:
-{domain}
+        DOMAIN:
+        {domain}
 
-CONTENT TYPE:
-{content_type}
+        CONTENT TYPE:
+        {content_type}
 
-OVERALL TOPIC:
-{overall_topic}
+        OVERALL TOPIC:
+        {overall_topic}
 
-PREREQUISITES:
-{json.dumps(prerequisites, ensure_ascii=False)}
+        PREREQUISITES:
+        {json.dumps(prerequisites, ensure_ascii=False)}
 
-KEY ENTITIES:
-{json.dumps(entity_names, ensure_ascii=False)}
+        KEY ENTITIES:
+        {json.dumps(entity_names, ensure_ascii=False)}
 
-TOPICS:
-{topic_text}
+        TOPICS:
+        {topic_text}
 
-LEARNING OBJECTIVES:
-{json.dumps(learning_objectives, ensure_ascii=False)}
+        LEARNING OBJECTIVES:
+        {json.dumps(learning_objectives, ensure_ascii=False)}
 
-CHAPTERS:
-{chapters_text or "No chapters available."}
+        CHAPTERS:
+        {chapters_text or "No chapters available."}
 
-TRANSCRIPT SAMPLE:
-{transcript_sample}
+        TRANSCRIPT SAMPLE:
+        {transcript_sample}
 
-Your task is to build a compact semantic knowledge graph.
+        You are building a semantic knowledge graph from a YouTube video.
 
-The graph should represent the most important concepts and entities
-in the video and how they relate to each other.
+        Use ONLY information supported by the supplied metadata and transcript.
 
-This may be:
+        Create 6-14 important nodes.
 
-- technical
-- scientific
-- historical
-- political
-- economic
-- geographical
-- educational
-- business
-- social
-- current affairs
+        Each node:
+        - id: letters, numbers, underscores only
+        - label
+        - type
+        - level
 
-Adapt the node types and relationships to the actual subject.
+        Levels:
+        0 = central subject
+        1 = major concepts/entities
+        2 = supporting concepts/examples
 
-Do NOT assume the video is technical.
+        Create only meaningful semantic relationships.
 
-Only use information supported by the Layer 2 metadata or transcript.
+        Allowed relations:
+        requires
+        enables
+        contains
+        contrasts
+        extends
+        caused
+        led_to
+        influences
+        opposes
+        part_of
+        depends_on
+        implements
+        explains
+        demonstrates
+        example_of
+        results_in
 
-Do not invent concepts, people, events, relationships, or dependencies.
+        Do NOT connect every node to the root.
+        Do NOT use "contains" merely because something belongs to the subject.
+        Do not invent facts.
 
-IMPORTANT GRAPH QUALITY RULE:
+        Create a concept tree rooted at the central subject.
 
-Do NOT connect every node to the root.
+        Create a dependency_order representing the most useful learning sequence.
 
-The root is not a container.
+        DEPENDENCY ORDER IS REQUIRED.
 
-Do NOT use "contains" simply because a concept belongs to the
-video's subject.
+        You MUST return at least 3 items when the transcript contains
+        enough information to establish a conceptual sequence.
 
-Only use "contains" when one concept genuinely contains another
-concept.
+        The dependency_order array MUST contain node IDs,
+        not node labels.
 
-Every edge must express a real semantic relationship.
+        The IDs must exactly match IDs from the "nodes" array.
 
-==================================================
-NODE RULES
-==================================================
+        The order represents the most useful conceptual
+        learning sequence: what should be understood first,
+        then what depends on it, and so on.
 
-Create 6-14 important nodes.
+        For example:
 
-Every node must have:
-
-- id
-- label
-- type
-- level
-
-Node IDs must contain only:
-
-letters, numbers, and underscores.
-
-Examples:
-
-n1
-n2
-central_topic
-economic_factor
-
-Never use spaces or punctuation in IDs.
-
-Possible node types include:
-
-concept
-event
-person
-place
-organization
-policy
-principle
-tool
-algorithm
-law
-movement
-example
-cause
-effect
-topic
-
-Use the most appropriate type for the actual content.
-
-"level" represents conceptual depth:
-
-0 = central topic
-1 = major concepts/entities
-2 = supporting concepts/examples
-
-==================================================
-EDGE RULES
-==================================================
-
-Create only meaningful relationships.
-
-Allowed relations:
-
-requires
-enables
-contains
-contrasts
-extends
-caused
-led_to
-influences
-opposes
-part_of
-depends_on
-implements
-explains
-demonstrates
-example_of
-results_in
-
-Do not create an edge merely because two concepts were mentioned
-near each other.
-
-==================================================
-CONCEPT TREE
-==================================================
-
-Create a hierarchical view of the knowledge.
-
-The root should represent the central subject.
-
-Branches should represent major areas discussed in the video.
-
-==================================================
-DEPENDENCY ORDER
-==================================================
-
-DEPENDENCY ORDER IS REQUIRED.
-
-So, Determine a useful learning order.
-
-You MUST return at least 3 items when the transcript contains
-enough information to establish a conceptual sequence.
-
-
-This means:
-
-what should a viewer understand first,
-what should they understand next,
-and what depends on those concepts?
-
-For a historical video this might represent:
-
-background -> event -> causes -> consequences
-
-For a technical video it might represent:
-
-fundamentals -> concept -> implementation -> application
-
-Do not force artificial dependencies.
-
-If no meaningful dependency exists, return [].
-
-Do NOT return [] merely because the video is non-technical.
-
-==================================================
-MERMAID RULES
-==================================================
-
-The "mermaid" field MUST start with:
-
-graph TD
-
-Use one edge per line.
-
-Example:
-
-graph TD
-    n1[Root] --> n2[Concept]
-    n1 --> n3[Concept2]
-    n2 --> n4[Example]
-
-Node IDs must match the IDs in the nodes array.
-
-Labels:
-
-- use square brackets
-- do not use parentheses
-- do not use quotes
-- do not use pipe characters
-- avoid colons
-- replace problematic punctuation with a dash
-
-Keep the Mermaid graph small and readable.
-
-Do not use subgraphs.
-
-==================================================
-OUTPUT
-==================================================
-
-Return ONLY valid JSON.
-
-{{
-    "nodes": [
-        {{
-            "id": "n1",
-            "label": "Central Concept",
-            "type": "concept",
-            "level": 0
-        }}
-    ],
-
-    "edges": [
-        {{
-            "from": "n1",
-            "to": "n2",
-            "relation": "explains"
-        }}
-    ],
-
-    "concept_tree": {{
-        "root": "Central Concept",
-        "branches": [
-            {{
-                "name": "Major Topic",
-                "children": [
-                    "Supporting Concept"
-                ]
-            }}
+        [
+            "n1",
+            "n2",
+            "n5",
+            "n6",
+            "n7"
         ]
-    }},
 
-    "dependency_order": [
-        "Understand the central concept",
-        "Understand the supporting concept",
-        "Understand the application or consequence"
-    ],
+        Every ID in dependency_order MUST exist in the nodes array.
 
-    "mermaid": "graph TD\\n    n1[Central Concept] --> n2[Supporting Concept]"
-}}
-"""
+        Do not invent IDs.
+
+        For non-technical content, the sequence may represent:
+
+        background -> event -> causes -> consequences
+
+        For technical content, it may represent:
+
+        fundamentals -> concept -> mechanism -> implementation -> application
+
+
+        If there is no meaningful dependency, return [].
+
+        Return ONLY one valid JSON object.
+
+        The object MUST contain:
+
+            {{
+                "nodes": [],
+                "edges": [],
+                "concept_tree": {{}},
+                "dependency_order": []
+            }}
+
+        ==================================================
+        OUTPUT
+        ==================================================
+
+        Return ONLY valid JSON.
+
+        {{
+            "nodes": [
+                {{
+                    "id": "n1",
+                    "label": "Central Concept",
+                    "type": "concept",
+                    "level": 0
+                }}
+            ],
+
+            "edges": [
+                {{
+                    "from": "n1",
+                    "to": "n2",
+                    "relation": "explains"
+                }}
+            ],
+
+            "concept_tree": {{
+                "root": "Central Concept",
+                "branches": [
+                    {{
+                        "name": "Major Topic",
+                        "children": [
+                            "Supporting Concept"
+                        ]
+                    }}
+                ]
+            }},
+
+            "dependency_order": [
+                "n1",
+                "n2",
+                "n5",
+                "n6",
+                "n7"
+            ],
+
+            "mermaid": "graph TD\\n    n1[Central Concept] --> n2[Supporting Concept]"
+        }}
+        """
 
     # ---------------------------------------------------------
     # LLM call
@@ -575,10 +454,10 @@ Return ONLY valid JSON.
             json_output=True,
         )
 
-        print("RAW LAYER 3 RESULT:")
+        """print("RAW LAYER 3 RESULT:")
         print(repr(result))
         print("MERMAID BEFORE SANITIZE:")
-        print(repr(result.get("mermaid", "")))
+        print(repr(result.get("mermaid", "")))"""
 
     except Exception as exc:
         logger.exception(
@@ -614,7 +493,7 @@ Return ONLY valid JSON.
     # Sanitize Mermaid
     # ---------------------------------------------------------
 
-    result["mermaid"] = _sanitize_mermaid(result.get("mermaid", ""))
+    # result["mermaid"] = _sanitize_mermaid(result.get("mermaid", ""))
 
     # ---------------------------------------------------------
     # Defensive defaults
@@ -624,6 +503,16 @@ Return ONLY valid JSON.
     result.setdefault("edges", [])
     result.setdefault("concept_tree", {})
     result.setdefault("dependency_order", [])
+
+    # ---------------------------------------------------------
+    # Validate dependency order
+    # ---------------------------------------------------------
+
+    valid_node_ids = {node.get("id") for node in result["nodes"] if node.get("id")}
+
+    result["dependency_order"] = [
+        node_id for node_id in result["dependency_order"] if node_id in valid_node_ids
+    ]
 
     result["mermaid"] = build_mermaid(
         result.get("nodes", []),
