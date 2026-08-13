@@ -5,6 +5,7 @@ from typing import Any
 
 from l2_layer import layer2_content_parse
 from llm.groq_service import LLMService
+from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 from video_processor.services.video_info import extract_chapters_and_info
 from video_processor.services.youtube_service import YoutubeTranscriptService
@@ -72,6 +73,65 @@ def _sanitize_mermaid(mermaid: str) -> str:
         mermaid = "\n".join(lines).strip()
 
     return mermaid
+
+
+def build_mermaid(nodes: list, edges: list) -> str:
+    """
+    Build Mermaid graph from structured nodes and edges.
+
+    The LLM is responsible for deciding the graph.
+    Python is responsible for rendering it.
+    """
+
+    if not nodes:
+        return ""
+
+    lines = ["graph TD"]
+
+    # ---------------------------------------------------------
+    # Nodes
+    # ---------------------------------------------------------
+
+    for node in nodes:
+        node_id = node.get("id", "").strip()
+        label = node.get("label", "").strip()
+
+        if not node_id or not label:
+            continue
+
+        # Mermaid-safe label
+        label = (
+            label.replace('"', "")
+            .replace("'", "")
+            .replace(":", " -")
+            .replace("|", " -")
+            .replace("(", "")
+            .replace(")", "")
+            .replace("[", "")
+            .replace("]", "")
+        )
+
+        lines.append(f"    {node_id}[{label}]")
+
+    # ---------------------------------------------------------
+    # Edges
+    # ---------------------------------------------------------
+
+    valid_ids = {node.get("id") for node in nodes if node.get("id")}
+
+    for edge in edges:
+        source = edge.get("from")
+        target = edge.get("to")
+
+        if source not in valid_ids:
+            continue
+
+        if target not in valid_ids:
+            continue
+
+        lines.append(f"    {source} --> {target}")
+
+    return "\n".join(lines)
 
 
 def _build_transcript_sample(transcript, max_chars: int = 4000) -> str:
@@ -289,6 +349,20 @@ Only use information supported by the Layer 2 metadata or transcript.
 
 Do not invent concepts, people, events, relationships, or dependencies.
 
+IMPORTANT GRAPH QUALITY RULE:
+
+Do NOT connect every node to the root.
+
+The root is not a container.
+
+Do NOT use "contains" simply because a concept belongs to the
+video's subject.
+
+Only use "contains" when one concept genuinely contains another
+concept.
+
+Every edge must express a real semantic relationship.
+
 ==================================================
 NODE RULES
 ==================================================
@@ -383,7 +457,13 @@ Branches should represent major areas discussed in the video.
 DEPENDENCY ORDER
 ==================================================
 
-Determine a useful learning order.
+DEPENDENCY ORDER IS REQUIRED.
+
+So, Determine a useful learning order.
+
+You MUST return at least 3 items when the transcript contains
+enough information to establish a conceptual sequence.
+
 
 This means:
 
@@ -400,6 +480,10 @@ For a technical video it might represent:
 fundamentals -> concept -> implementation -> application
 
 Do not force artificial dependencies.
+
+If no meaningful dependency exists, return [].
+
+Do NOT return [] merely because the video is non-technical.
 
 ==================================================
 MERMAID RULES
@@ -491,6 +575,11 @@ Return ONLY valid JSON.
             json_output=True,
         )
 
+        print("RAW LAYER 3 RESULT:")
+        print(repr(result))
+        print("MERMAID BEFORE SANITIZE:")
+        print(repr(result.get("mermaid", "")))
+
     except Exception as exc:
         logger.exception(
             "Layer 3 knowledge graph generation failed: %s",
@@ -536,6 +625,11 @@ Return ONLY valid JSON.
     result.setdefault("concept_tree", {})
     result.setdefault("dependency_order", [])
 
+    result["mermaid"] = build_mermaid(
+        result.get("nodes", []),
+        result.get("edges", []),
+    )
+
     return result
 
 
@@ -552,11 +646,14 @@ if __name__ == "__main__":
 
     llm_service = LLMService()
 
-    transcript_service = YoutubeTranscriptService()
+    # transcript_service = YoutubeTranscriptService()
 
-    transcript = transcript_service.fetch_transcript(id)
+    # transcript = transcript_service.fetch_transcript(id)
 
-    video_info = extract_chapters_and_info(id)
+    transcript_service = TranscriptService()
+    transcript = transcript_service.get(id)
+
+    video_info = transcript.video_info
 
     layer2_result = asyncio.run(
         layer2_content_parse(

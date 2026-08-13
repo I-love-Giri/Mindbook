@@ -3,6 +3,7 @@ import logging
 from typing import Any
 import asyncio
 from llm.groq_service import LLMService
+from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 from video_processor.services.video_info import extract_chapters_and_info
 from video_processor.services.youtube_service import YoutubeTranscriptService
@@ -285,11 +286,14 @@ if __name__ == "__main__":
 
     llm_service = LLMService()
 
-    transcript_service = YoutubeTranscriptService()
+    # transcript_service = YoutubeTranscriptService()
 
-    transcript = transcript_service.fetch_transcript(id)
+    # transcript = transcript_service.fetch_transcript(id)
 
-    video_info = extract_chapters_and_info(id)
+    transcript_service = TranscriptService()
+    transcript = transcript_service.get(id)
+
+    video_info = transcript.video_info
 
     layer2_result = asyncio.run(
         layer2_content_parse(
