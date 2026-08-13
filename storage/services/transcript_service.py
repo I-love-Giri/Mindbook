@@ -53,11 +53,13 @@ class TranscriptService:
 """
 
 from typing import Optional
+
 from cache.memory_cache import MemoryCache
 from pipeline.cleaning.cleaner import TranscriptCleaner
 from storage.base_storage import BaseStorage
 from storage.mongo_storage import MongoStorage
 from video_processor.services.youtube_service import YoutubeTranscriptService
+from video_processor.services.video_info import extract_chapters_and_info
 
 
 class TranscriptService:
@@ -91,7 +93,7 @@ class TranscriptService:
             self.cache.set(video_id, transcript)
             return transcript
 
-        # 3. YouTube
+        # 3. YouTube - transcript
         fetch_service = YoutubeTranscriptService()
         transcript = fetch_service.fetch_transcript(video_id)
 
@@ -100,10 +102,12 @@ class TranscriptService:
 
         transcript = self.clean_transcript(transcript)
 
-        # 4. Save
-        self.save(transcript)
+        # 4. YouTube - video metadata
+        video_info = extract_chapters_and_info(video_id)
+        transcript.video_info = video_info
 
-        # self.cache.set(video_id, transcript)
+        # 5. Save transcript + video_info
+        self.save(transcript)
 
         return transcript
 

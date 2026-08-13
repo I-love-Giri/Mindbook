@@ -7,12 +7,13 @@ from typing import Any, Optional
 
 from config.prompts.services.pyd_model import SubjectClassification
 
-'''
+"""
 dataclass:  decorator from Python's dataclasses module.
 
 A decorator is something that modifies a class or function.
 
-'''
+"""
+
 
 @dataclass
 class Segment:
@@ -20,7 +21,8 @@ class Segment:
     start: float
     duration: float
 
-'''
+
+"""
 @dataclass: This tells Python:
 
 "Generate useful methods for this class automatically."
@@ -41,23 +43,26 @@ class Segment:
 
 Python writes it for you.
 
-'''
+"""
+
 
 @dataclass
 class Transcript:
     video_id: str
     language_code: str
     language: str
-    segments: list[Segment] 
-    #summary: Optional[str] = None
+    segments: list[Segment]
+    # summary: Optional[str] = None
     summary: Optional[dict[str, Any]] = None
     classification: Optional[SubjectClassification] = None
+    video_info: Optional[dict[str, Any]] = (None,)
 
     @property
-    def text(self)->str:
-        return  " ".join(segment.text for segment in self.segments)
+    def text(self) -> str:
+        return " ".join(segment.text for segment in self.segments)
 
-'''
+
+"""
 Transcript
 |
 │── video_id = "abc123
@@ -90,4 +95,4 @@ Hello everyone Welcome!
 
 Notice that text is accessed like an attribute, not a method, because of @property
 
-'''
+"""
