@@ -344,33 +344,62 @@ async def layer3_knowledge_graph(
 
         Create a dependency_order representing the most useful learning sequence.
 
-        DEPENDENCY ORDER IS REQUIRED.
+        DEPENDENCY ORDER RULES:
 
-        You MUST return at least 3 items when the transcript contains
-        enough information to establish a conceptual sequence.
+        dependency_order is NOT a list of all nodes.
 
-        The dependency_order array MUST contain node IDs,
-        not node labels.
+        It represents only the conceptual prerequisites needed to understand
+        the main ideas of the video.
 
-        The IDs must exactly match IDs from the "nodes" array.
+        Do NOT include:
+        - examples unless the example itself is necessary to understand
+        another concept
+        - people merely mentioned
+        - books or sources
+        - historical examples unless they introduce a concept required later
 
-        The order represents the most useful conceptual
-        learning sequence: what should be understood first,
-        then what depends on it, and so on.
+        Do include:
+        - foundational concepts
+        - definitions
+        - mechanisms
+        - principles
+        - techniques that depend on earlier concepts
 
-        For example:
+        The dependency order should normally contain 3-7 nodes.
+
+        The first node should be the most foundational concept,
+        not necessarily the root node.
+
+        Every node ID must exist in the nodes array.
+
+        Do not include a node simply because it exists in the graph.
+
+        For example, if:
+
+        n1 = Elicitation Definition
+        n2 = Statements Instead of Questions
+        n3 = Correction-Triggering Tactic
+        n4 = Disbelief Technique
+        n5 = Whole Foods Salary Example
+
+        then a good dependency order is:
 
         [
             "n1",
             "n2",
-            "n5",
-            "n6",
-            "n7"
+            "n3",
+            "n4"
         ]
 
-        Every ID in dependency_order MUST exist in the nodes array.
+        and NOT:
 
-        Do not invent IDs.
+        [
+            "n1",
+            "n2",
+            "n3",
+            "n4",
+            "n5"
+        ]
 
         For non-technical content, the sequence may represent:
 
@@ -379,7 +408,6 @@ async def layer3_knowledge_graph(
         For technical content, it may represent:
 
         fundamentals -> concept -> mechanism -> implementation -> application
-
 
         If there is no meaningful dependency, return [].
 
