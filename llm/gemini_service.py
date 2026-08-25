@@ -1,9 +1,12 @@
-import json
 import logging
+from typing import TypeVar
 
 from google import genai
+from pydantic import BaseModel
 from google.genai import types
 from google.genai.errors import APIError
+
+T = TypeVar("T", bound=BaseModel)
 
 from tenacity import (
     before_sleep_log,
@@ -36,32 +39,20 @@ class GeminiService:
         prompt: str,
         temperature: float = 0.7,
         max_tokens: int = 3000,
-        json_output: bool = False,
-    ):
-        """
-        Generate text from Gemini.
-
-        Args:
-            prompt: User prompt.
-            temperature: Sampling temperature.
-            max_tokens: Maximum output tokens.
-            json_output: Whether to request JSON output.
-
-        Returns:
-            str | dict
-        """
+        response_schema: type[T] | None = None,
+    ) -> str | T:
 
         config = types.GenerateContentConfig(
             temperature=temperature,
             max_output_tokens=max_tokens,
             system_instruction=(
-                "You are an expert assistant "
-                "for summarizing YouTube transcripts."
+                "You are an expert assistant " "for analyzing YouTube transcripts."
             ),
         )
 
-        if json_output:
+        if response_schema:
             config.response_mime_type = "application/json"
+            config.response_schema = response_schema
 
         response = self.client.models.generate_content(
             model=GEMINI_MODEL_NAME,
@@ -69,13 +60,7 @@ class GeminiService:
             config=config,
         )
 
-        content = response.text
+        if response_schema:
+            return response.parsed
 
-        if json_output:
-            try:
-                return json.loads(content)
-            except json.JSONDecodeError as e:
-                logger.error("Failed to parse JSON response: %s", e)
-                raise
-
-        return content
+        return response.text

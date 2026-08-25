@@ -1,6 +1,5 @@
 import json
 import logging
-import re
 
 from groq import (
     APIConnectionError,
@@ -23,88 +22,6 @@ logger = logging.getLogger(__name__)
 
 
 DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for analyzing YouTube transcripts."
-
-JSON_INSTRUCTION = (
-    "Respond only with valid json. " "Do not include markdown or commentary."
-)
-
-
-def _extract_json(text: str):
-    """
-    Best-effort JSON extraction from an LLM response.
-
-    Attempts:
-    1. Direct json.loads()
-    2. Extract first complete JSON object/array
-    3. Remove trailing commas and retry
-    """
-
-    if not text:
-        return None
-
-    cleaned = text.replace("```json", "").replace("```", "").strip()
-
-    # First attempt: response is already valid JSON.
-    try:
-        return json.loads(cleaned)
-    except json.JSONDecodeError:
-        pass
-
-    # Second attempt: find a JSON object or array inside the response.
-    for start_char, end_char in (("{", "}"), ("[", "]")):
-
-        start = cleaned.find(start_char)
-
-        if start == -1:
-            continue
-
-        depth = 0
-        in_string = False
-        escape = False
-
-        for i, ch in enumerate(cleaned[start:], start):
-
-            if escape:
-                escape = False
-                continue
-
-            if ch == "\\" and in_string:
-                escape = True
-                continue
-
-            if ch == '"' and not escape:
-                in_string = not in_string
-                continue
-
-            if in_string:
-                continue
-
-            if ch == start_char:
-                depth += 1
-
-            elif ch == end_char:
-                depth -= 1
-
-                if depth == 0:
-                    candidate = cleaned[start : i + 1]
-
-                    try:
-                        return json.loads(candidate)
-
-                    except json.JSONDecodeError:
-
-                        repaired = re.sub(
-                            r",\s*([}\]])",
-                            r"\1",
-                            candidate,
-                        )
-
-                        try:
-                            return json.loads(repaired)
-                        except json.JSONDecodeError:
-                            break
-
-    return None
 
 
 class LLMService:
@@ -137,32 +54,20 @@ class LLMService:
     async def generate(
         self,
         prompt: str,
-        system_prompt: str | None = None,
+        system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         temperature: float = 0.7,
         max_tokens: int = 3000,
         json_output: bool = False,
-    ):
-
-        system_content = system_prompt or DEFAULT_SYSTEM_PROMPT
-
-        if json_output:
-            system_content = f"{system_content}\n\n" f"{JSON_INSTRUCTION}"
-
+    ) -> str | dict:
         response = await self.client.chat.completions.create(
             model=MODEL_NAME,
             messages=[
-                {
-                    "role": "system",
-                    "content": system_content,
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt},
             ],
             temperature=temperature,
             max_completion_tokens=max_tokens,
-            response_format=({"type": "json_object"} if json_output else None),
+            response_format={"type": "json_object"} if json_output else None,
         )
 
         content = response.choices[0].message.content
@@ -171,62 +76,9 @@ class LLMService:
             raise ValueError("LLM returned an empty response.")
 
         if json_output:
-
-            result = _extract_json(content)
-
-            if result is None:
-                logger.error(
-                    "LLM returned unparseable JSON: %s",
-                    content,
-                )
-
-                raise ValueError("LLM did not return valid JSON.")
-
-            return result
-
-        return content.strip()
-
-    """
-
-    def generate(
-        self,
-        prompt: str,
-        temperature: float = 0.7,
-        max_tokens: int = 1024,
-        json_output: bool = False
-    ) -> str:
-        logger.info("Sending request to Groq API")
-
-        response = self.client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are an expert assistant for summarizing "
-                        "YouTube transcripts."
-                    ),
-                },
-                {
-                    "role": "user",
-                    "content": prompt,
-                },
-            ],
-            temperature=temperature,
-            max_completion_tokens=max_tokens,
-        )
-
-        logger.info("Received response from Groq API")
-
-        #return response.choices[0].message.content
-
-        content = response.choices[0].message.content
-        if json_output:
             return json.loads(content)
 
-        return content
-
-    """
+        return content.strip()
 
 
 """
