@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import TypeVar
 
 from groq import (
     APIConnectionError,
@@ -7,6 +8,8 @@ from groq import (
     AsyncGroq,
     RateLimitError,
 )
+
+from pydantic import BaseModel
 
 from tenacity import (
     before_sleep_log,
@@ -20,6 +23,7 @@ from config.settings import GROQ_API_KEY, MODEL_NAME
 
 logger = logging.getLogger(__name__)
 
+T = TypeVar("T", bound=BaseModel)
 
 DEFAULT_SYSTEM_PROMPT = "You are an expert assistant for analyzing YouTube transcripts."
 
@@ -57,23 +61,52 @@ class LLMService:
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         temperature: float = 0.7,
         max_tokens: int = 3000,
+        response_schema: type[T] | None = None,
         json_output: bool = False,
-    ) -> str | dict:
-        response = await self.client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": prompt},
+    ) -> str | dict | T:
+
+        request_kwargs = {
+            "model": MODEL_NAME,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": system_prompt,
+                },
+                {
+                    "role": "user",
+                    "content": prompt,
+                },
             ],
-            temperature=temperature,
-            max_completion_tokens=max_tokens,
-            response_format={"type": "json_object"} if json_output else None,
+            "temperature": temperature,
+            "max_completion_tokens": max_tokens,
+        }
+
+        if response_schema:
+            request_kwargs["response_format"] = {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_schema.__name__,
+                    "strict": True,
+                    "schema": response_schema.model_json_schema(),
+                },
+            }
+
+        elif json_output:
+            request_kwargs["response_format"] = {
+                "type": "json_object",
+            }
+
+        response = await self.client.chat.completions.create(
+            **request_kwargs,
         )
 
         content = response.choices[0].message.content
 
         if not content:
             raise ValueError("LLM returned an empty response.")
+
+        if response_schema:
+            return response_schema.model_validate_json(content)
 
         if json_output:
             return json.loads(content)
@@ -122,5 +155,66 @@ Random "jitter" reduces the chance of many clients retrying simultaneously.
 | Circuit breaker (for larger systems) |
 
 If the provider is clearly down, stop retrying for a short period instead of repeatedly sending requests.
+
+"""
+
+
+"""
+Ek generic LLMService banaya
+Har use-case ke liye alag function nahi banana.
+Ek hi generate() function se different LLM calls handle hongi.
+
+Normal text generation support
+
+result = await llm_service.generate(
+    prompt=prompt
+)
+
+→ simple str response.
+
+JSON output support
+
+result = await llm_service.generate(
+    prompt=prompt,
+    json_output=True
+)
+
+→ valid JSON ko Python dict mein convert karna.
+
+Structured output / enforced schema support
+
+result = await llm_service.generate(
+    prompt=prompt,
+    response_schema=ContentParserResult
+)
+
+→ LLM ko expected structure enforce karna using Pydantic schema.
+
+Schema ko globally enforce nahi kiya
+response_schema optional rakha.
+Jahan schema chahiye → pass karo.
+Jahan simple answer chahiye → kuch pass mat karo.
+Isse future mein dozens of different LLM calls easily handle hongi.
+Async support rakha
+Groq ke liye AsyncGroq
+await llm_service.generate(...)
+Backend/API applications ke liye better fit.
+Retry + exponential backoff add kiya
+Connection error
+Timeout
+Rate limit
+Temporary failures par automatically retry.
+Basically architecture ye ban gaya:
+                    LLMService
+                        │
+                    generate()
+                        │
+          ┌─────────────┼─────────────┐
+          ↓             ↓             ↓
+       Text           JSON        Pydantic
+       output         output       Schema
+          │             │             │
+         str           dict      BaseModel
+
 
 """
