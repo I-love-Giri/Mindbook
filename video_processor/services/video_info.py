@@ -95,8 +95,3 @@ def extract_chapters_and_info(video_id: str) -> dict:
         "chapters": chapters,
     }
 
-
-if __name__ == "__main__":
-    result = extract_chapters_and_info("dQw4w9WgXcQ")
-    print("RESULT:")
-    print(result)
