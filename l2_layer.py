@@ -69,7 +69,7 @@ async def layer2_content_parse(
 
     result = await llm_service.generate(
         prompt=prompt,
-        max_tokens=1500,
+        max_tokens=2000,
         temperature=0.2,
         json_output=True,
     )
