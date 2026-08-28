@@ -1,309 +1,19 @@
 import json
 import logging
-from typing import Any, Dict, Tuple
+from typing import Any, Dict
 
+from features.synthesis import category_instructions
+
+from features.synthesis.l6_context_builder import (
+    build_concepts_text,
+    build_entities_text,
+    build_sections_text,
+)
+from features.synthesis.l6_prompt import build_synthesis_prompt
+from features.synthesis.l6_validator import normalize_synthesis_result
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_json(raw: str) -> dict:
-    """
-    Extract a JSON object from an LLM response.
-
-    Handles:
-    - dict responses
-    - plain JSON strings
-    - ```json ... ``` fenced responses
-    """
-
-    if not raw:
-        return {}
-
-    if isinstance(raw, dict):
-        return raw
-
-    raw = raw.strip()
-
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-
-        raw = "\n".join(lines).strip()
-
-    try:
-        result = json.loads(raw)
-
-        if isinstance(result, dict):
-            return result
-
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse L6 JSON response")
-
-    return {}
-
-
-def _section_explanation(section: dict, max_chars: int = 500) -> str:
-    """
-    Extract a compact explanation from an L5 section.
-
-    L5 currently stores explanations inside paragraph blocks rather
-    than using a dedicated 'explanation' field.
-    """
-
-    explanation = section.get("explanation")
-
-    if explanation:
-        return str(explanation)[:max_chars]
-
-    paragraphs = []
-
-    for block in section.get("blocks", []):
-        if block.get("type") == "paragraph":
-            content = block.get("content", "")
-
-            if content:
-                paragraphs.append(content)
-
-    return " ".join(paragraphs)[:max_chars]
-
-
-def _build_sections_text(
-    sections: list,
-    max_chars_per_section: int = 500,
-) -> str:
-    """
-    Build a compact representation of all L5 sections.
-
-    Keeps section boundaries and timestamps so L6 can cite the
-    originating section.
-    """
-
-    parts = []
-
-    for index, section in enumerate(sections):
-
-        title = (
-            section.get("title")
-            or section.get("section_title")
-            or f"Section {index + 1}"
-        )
-
-        start = section.get("start", 0)
-
-        explanation = _section_explanation(
-            section,
-            max_chars=max_chars_per_section,
-        )
-
-        concepts = section.get("key_concepts", [])
-
-        concepts_text = ", ".join(str(concept) for concept in concepts[:10] if concept)
-
-        parts.append(
-            f"[SECTION {index + 1}]\n"
-            f"TITLE: {title}\n"
-            f"START: {float(start):.0f}s\n"
-            f"EXPLANATION: {explanation}\n"
-            f"KEY CONCEPTS: {concepts_text}"
-        )
-
-    return "\n\n".join(parts)
-
-
-def _build_entities_text(parsed: dict) -> str:
-    """
-    Build compact entity context from L2.
-    """
-
-    entities = parsed.get("key_entities", [])
-
-    return ", ".join(
-        f"{entity.get('name', '')} " f"({entity.get('type', 'concept')})"
-        for entity in entities[:20]
-        if entity.get("name")
-    )
-
-
-def _build_concepts_text(
-    parsed: dict,
-    kg: dict,
-) -> str:
-    """
-    Combine L2 topics and L3 graph nodes into a compact
-    conceptual representation.
-    """
-
-    topics = parsed.get("topics", [])
-
-    topic_lines = [
-        f"- {topic.get('title', '')}: {topic.get('summary', '')}"
-        for topic in topics[:15]
-        if topic.get("title")
-    ]
-
-    nodes = kg.get("nodes", [])
-
-    node_lines = [
-        f"- {node.get('id')}: {node.get('label')} " f"(level {node.get('level', 0)})"
-        for node in nodes[:20]
-        if node.get("id") and node.get("label")
-    ]
-
-    result = []
-
-    if topic_lines:
-        result.append("L2 TOPICS:\n" + "\n".join(topic_lines))
-
-    if node_lines:
-        result.append("L3 KNOWLEDGE GRAPH NODES:\n" + "\n".join(node_lines))
-
-    return "\n\n".join(result)
-
-
-def _category_instructions(
-    domain: str,
-    content_type: str,
-) -> Tuple[str, str, str]:
-
-    domain_l = (domain or "").lower()
-    content_type_l = (content_type or "").lower()
-
-    code_keywords = {
-        "programming",
-        "software",
-        "coding",
-        "backend",
-        "frontend",
-        "database",
-        "devops",
-        "cybersecurity",
-        "algorithm",
-        "data structures",
-        "machine learning",
-        "deep learning",
-        "data science",
-        "artificial intelligence",
-    }
-
-    quant_keywords = {
-        "mathematics",
-        "math",
-        "statistics",
-        "physics",
-        "chemistry",
-        "biology",
-        "engineering",
-        "economics",
-        "finance",
-        "accounting",
-        "calculus",
-        "algebra",
-        "geometry",
-        "probability",
-    }
-
-    narrative_types = {
-        "vlog",
-        "interview",
-        "documentary",
-        "news",
-        "debate",
-        "review",
-        "podcast",
-        "story",
-    }
-
-    if content_type_l in narrative_types:
-        category = "narrative"
-
-    elif any(keyword in domain_l for keyword in code_keywords):
-        category = "code"
-
-    elif any(keyword in domain_l for keyword in quant_keywords):
-        category = "quant"
-
-    else:
-        category = "narrative"
-
-    if category == "code":
-        guide_instruction = """
-Write a practical technical guide covering:
-1. the central problem,
-2. the important concepts,
-3. how the mechanisms work,
-4. implementation considerations,
-5. practical applications.
-
-Include code concepts only when supported by the analyzed sections.
-Do not invent APIs, syntax, commands, or implementations.
-"""
-
-        next_steps_instruction = (
-            "Suggest logical next concepts, tools, projects, "
-            "or practice activities based on the material."
-        )
-
-        term_instruction = (
-            "Define the technical term in plain English and explain "
-            "how it is used in the context of this topic."
-        )
-
-    elif category == "quant":
-        guide_instruction = """
-Write a conceptual guide covering:
-1. the underlying idea,
-2. important definitions or formulas,
-3. how the reasoning works,
-4. why the result matters,
-5. a worked example only when directly supported by the material.
-
-Do not invent formulas or numerical claims.
-"""
-
-        next_steps_instruction = (
-            "Suggest related concepts, exercises, problem types, "
-            "or subjects to study next."
-        )
-
-        term_instruction = (
-            "Define the term, formula, or concept clearly and give "
-            "a simple example only when supported by the material."
-        )
-
-    else:
-        guide_instruction = """
-Write a factual briefing covering:
-1. background and context,
-2. the major people, places, events, arguments, or ideas,
-3. relationships between them,
-4. why the subject matters,
-5. important perspectives or unresolved questions.
-
-Remain factual and balanced.
-"""
-
-        next_steps_instruction = (
-            "Suggest related topics, events, books, documentaries, "
-            "or concepts that logically extend this material."
-        )
-
-        term_instruction = (
-            "Define the name, place, acronym, policy, or specialized "
-            "term and explain its relevance to the subject."
-        )
-
-    return (
-        category,
-        guide_instruction.strip(),
-        next_steps_instruction,
-        term_instruction,
-    )
 
 
 async def layer6_synthesis(
@@ -367,14 +77,14 @@ async def layer6_synthesis(
         "intermediate",
     )
 
-    entities_text = _build_entities_text(parsed)
+    entities_text = build_entities_text(parsed)
 
-    sections_text = _build_sections_text(
+    sections_text = build_sections_text(
         sections,
         max_chars_per_section=500,
     )
 
-    concepts_text = _build_concepts_text(
+    concepts_text = build_concepts_text(
         parsed,
         kg,
     )
@@ -385,259 +95,38 @@ async def layer6_synthesis(
     )
 
     category, guide_instruction, next_steps_instruction, term_instruction = (
-        _category_instructions(
+        category_instructions(
             domain,
             content_type,
         )
     )
 
-    prompt = f"""
-You are performing the final synthesis stage of a grounded
-knowledge extraction pipeline.
-
-You have NOT been given the entire original transcript.
-
-You must therefore use ONLY the information contained in:
-
-1. Layer 2 semantic metadata
-2. Layer 3 knowledge graph
-3. Layer 5 section analyses
-
-Do not invent information that is not supported by those sources.
-
-==================================================
-VIDEO
-==================================================
-
-TITLE:
-{title}
-
-DURATION:
-{float(duration or 0):.0f} seconds
-
-DOMAIN:
-{domain}
-
-CONTENT TYPE:
-{content_type}
-
-DIFFICULTY:
-{difficulty}
-
-CONTENT CATEGORY:
-{category}
-
-==================================================
-LAYER 2
-==================================================
-
-OVERALL TOPIC:
-{parsed.get("overall_topic", "")}
-
-PREREQUISITES:
-{json.dumps(
-    parsed.get("prerequisites", []),
-    ensure_ascii=False,
-)}
-
-LEARNING OBJECTIVES:
-{json.dumps(
-    parsed.get("learning_objectives", []),
-    ensure_ascii=False,
-)}
-
-KEY ENTITIES:
-{entities_text}
-
-==================================================
-CONCEPT STRUCTURE
-==================================================
-
-{concepts_text}
-
-DEPENDENCY ORDER:
-{json.dumps(
-    dependency_order,
-    ensure_ascii=False,
-)}
-
-==================================================
-ANALYZED SECTIONS
-==================================================
-
-{sections_text}
-
-==================================================
-SYNTHESIS RULES
-==================================================
-
-The analyzed sections are the primary evidence.
-
-Do not:
-
-- invent facts
-- invent statistics
-- invent quotations
-- invent citations
-- invent historical events
-- invent APIs
-- invent code
-- invent formulas
-- claim that something is missing merely because it was not present
-  in the supplied summaries
-- present speculation as fact
-
-If there is insufficient evidence to determine whether something
-was omitted or outdated, explicitly say so.
-
-For "gaps":
-
-Distinguish between:
-
-1. Explicit omission:
-   A relevant issue clearly expected from the subject but absent
-   from the analyzed material.
-
-2. Possible limitation:
-   The available section analyses do not provide enough evidence
-   to determine whether the subject was adequately covered.
-
-3. Potential outdatedness:
-   Only mention this when the supplied material itself provides
-   evidence that something may have changed.
-
-Do not perform external fact checking.
-
-==================================================
-CONTENT-SPECIFIC INSTRUCTIONS
-==================================================
-
-{guide_instruction}
-
-==================================================
-OUTPUT
-==================================================
-
-Return ONLY valid JSON.
-
-{{
-    "complete_guide": "...",
-
-    "executive_summary": "...",
-
-    "faq": [
-        {{
-            "q": "...",
-            "a": "...",
-            "source_section": 1
-        }}
-    ],
-
-    "gaps": "...",
-
-    "related_concepts": [
-        "...",
-        "...",
-        "...",
-        "..."
-    ],
-
-    "next_steps": [
-        "..."
-    ],
-
-    "flashcards": [
-        {{
-            "front": "...",
-            "back": "..."
-        }}
-    ],
-
-    "key_terms": [
-        {{
-            "term": "...",
-            "definition": "...",
-            "example": "..."
-        }}
-    ],
-
-    "difficulty_progression": [
-        {{
-            "level": "beginner",
-            "description": "...",
-            "concepts": []
-        }},
-        {{
-            "level": "intermediate",
-            "description": "...",
-            "concepts": []
-        }},
-        {{
-            "level": "advanced",
-            "description": "...",
-            "concepts": []
-        }}
-    ]
-}}
-
-==================================================
-FIELD RULES
-==================================================
-
-complete_guide:
-{guide_instruction}
-
-Write 4-6 substantial paragraphs.
-
-executive_summary:
-Write 2-3 sentences explaining what the material is about
-and why it matters.
-
-faq:
-Create 3-6 high-value questions.
-
-Every factual answer must be grounded in the supplied sections.
-
-source_section:
-Use the section number containing the strongest evidence.
-
-Use null when the answer synthesizes multiple sections.
-
-gaps:
-Be conservative and evidence-aware.
-
-related_concepts:
-Return 3-6 concepts that logically extend the subject.
-
-next_steps:
-Return 3-5 useful learning activities or subjects.
-
-{next_steps_instruction}
-
-flashcards:
-Return 5-10 concise cards.
-
-key_terms:
-Return 5-10 important terms.
-
-{term_instruction}
-
-difficulty_progression:
-Explain how the concepts can be learned from foundational
-to advanced level.
-
-Use concept names from the supplied L2/L3 data whenever possible.
-
-Raw JSON only.
-"""
+    prompt = build_synthesis_prompt(
+        title=title,
+        duration=duration,
+        domain=domain,
+        content_type=content_type,
+        difficulty=difficulty,
+        entities_text=entities_text,
+        sections_text=sections_text,
+        concepts_text=concepts_text,
+        dependency_order=dependency_order,
+        category=category,
+        parsed=parsed,
+        guide_instruction=guide_instruction,
+        next_steps_instruction=next_steps_instruction,
+        term_instruction=term_instruction,
+    )
 
     try:
         result = await llm_service.generate(
             prompt=prompt,
-            max_tokens=3500,
+            max_tokens=5000,
             temperature=0.15,
             json_output=True,
         )
+
+        return normalize_synthesis_result(result)
 
     except Exception as exc:
         logger.exception(
@@ -656,38 +145,6 @@ Raw JSON only.
             "key_terms": [],
             "difficulty_progression": [],
         }
-
-    if isinstance(result, str):
-        result = _extract_json(result)
-
-    if not isinstance(result, dict):
-        return {
-            "complete_guide": "",
-            "executive_summary": "",
-            "faq": [],
-            "gaps": "",
-            "related_concepts": [],
-            "next_steps": [],
-            "flashcards": [],
-            "key_terms": [],
-            "difficulty_progression": [],
-        }
-
-    # ---------------------------------------------------------
-    # Defensive defaults
-    # ---------------------------------------------------------
-
-    result.setdefault("complete_guide", "")
-    result.setdefault("executive_summary", "")
-    result.setdefault("faq", [])
-    result.setdefault("gaps", "")
-    result.setdefault("related_concepts", [])
-    result.setdefault("next_steps", [])
-    result.setdefault("flashcards", [])
-    result.setdefault("key_terms", [])
-    result.setdefault("difficulty_progression", [])
-
-    return result
 
 
 if __name__ == "__main__":
