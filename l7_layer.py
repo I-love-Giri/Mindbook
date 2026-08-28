@@ -3,6 +3,16 @@ import json
 import logging
 from typing import Any, Dict
 
+from features.study_assets.l7_context_builder import (
+    build_dependency_context,
+    build_flashcard_context,
+    build_graph_context,
+    build_key_terms_context,
+    build_sections_context,
+)
+from features.study_assets.l7_prompt import build_study_assets_prompt
+from features.study_assets.l7_validators import normalize_study_assets_result
+
 from l6_layer import layer6_synthesis
 from llm.groq_service import LLMService
 from l2_layer import layer2_content_parse
@@ -16,16 +26,16 @@ logger = logging.getLogger(__name__)
 # JSON HELPERS
 # ============================================================
 
-
+"""
 def _extract_json(raw: Any) -> dict:
-    """
+    ""
     Extract a JSON object from an LLM response.
 
     Handles:
         - dict responses
         - plain JSON strings
         - ```json ... ``` fenced responses
-    """
+    ""
 
     if not raw:
         return {}
@@ -73,231 +83,14 @@ def _extract_json(raw: Any) -> dict:
 
 
 # ============================================================
-# SECTION HELPERS
-# ============================================================
-
-
-def _extract_section_text(section: Dict[str, Any], max_chars: int = 800) -> str:
-    """
-    Extract useful explanatory text from an L5 section.
-
-    Prefers paragraph blocks but falls back to other textual blocks.
-    """
-
-    blocks = section.get("blocks") or []
-
-    paragraph_parts = []
-
-    for block in blocks:
-        if not isinstance(block, dict):
-            continue
-
-        if block.get("type") != "paragraph":
-            continue
-
-        content = block.get("content", "")
-
-        if content:
-            paragraph_parts.append(str(content))
-
-    text = " ".join(paragraph_parts).strip()
-
-    if not text:
-        fallback_parts = []
-
-        for block in blocks:
-            if not isinstance(block, dict):
-                continue
-
-            content = block.get("content", "")
-
-            if content:
-                fallback_parts.append(str(content))
-
-        text = " ".join(fallback_parts).strip()
-
-    return text[:max_chars]
-
-
-def _build_sections_context(
-    sections: list,
-    max_chars: int = 7000,
-) -> str:
-    """
-    Build a compact representation of all L5 sections.
-
-    Includes:
-        - section number
-        - title
-        - timestamps
-        - key concepts
-        - section explanation
-    """
-
-    parts = []
-    current_length = 0
-
-    for index, section in enumerate(sections):
-
-        title = section.get("title") or "Untitled Section"
-
-        start = section.get("start", 0) or 0
-        end = section.get("end", start) or start
-
-        concepts = section.get("key_concepts") or []
-
-        concepts_text = ", ".join(str(concept) for concept in concepts[:10] if concept)
-
-        explanation = _extract_section_text(
-            section,
-            max_chars=700,
-        )
-
-        block = (
-            f"SECTION {index + 1}\n"
-            f"TITLE: {title}\n"
-            f"TIMESTAMP: {float(start):.1f}s - {float(end):.1f}s\n"
-            f"KEY CONCEPTS: {concepts_text or 'None'}\n"
-            f"EXPLANATION: {explanation or 'None'}"
-        )
-
-        if current_length + len(block) > max_chars:
-            break
-
-        parts.append(block)
-        current_length += len(block) + 2
-
-    return "\n\n".join(parts)
-
-
-# ============================================================
-# L3 CONTEXT
-# ============================================================
-
-
-def _build_dependency_context(kg: Dict[str, Any]) -> str:
-    """
-    Convert L3 dependency_order into readable concept names.
-    """
-
-    nodes = kg.get("nodes") or []
-
-    node_lookup = {
-        node.get("id"): node.get("label")
-        for node in nodes
-        if isinstance(node, dict) and node.get("id") and node.get("label")
-    }
-
-    dependency_order = kg.get("dependency_order") or []
-
-    if not dependency_order:
-        return "No meaningful dependency order was generated."
-
-    lines = []
-
-    for index, node_id in enumerate(dependency_order, start=1):
-
-        label = node_lookup.get(node_id, node_id)
-
-        lines.append(f"{index}. {label}")
-
-    return "\n".join(lines)
-
-
-def _build_graph_context(kg: Dict[str, Any]) -> str:
-    """
-    Convert important L3 graph nodes into compact text.
-    """
-
-    nodes = kg.get("nodes") or []
-
-    lines = []
-
-    for node in nodes[:14]:
-
-        if not isinstance(node, dict):
-            continue
-
-        node_id = node.get("id", "")
-        label = node.get("label", "")
-        node_type = node.get("type", "")
-        level = node.get("level", "")
-
-        if not label:
-            continue
-
-        lines.append(f"- {node_id}: {label} " f"(type={node_type}, level={level})")
-
-    return "\n".join(lines)
-
-
-# ============================================================
-# L6 CONTEXT
-# ============================================================
-
-
-def _build_key_terms_context(synthesis: Dict[str, Any]) -> str:
-    """
-    Build readable L6 key-term context.
-    """
-
-    terms = synthesis.get("key_terms") or []
-
-    lines = []
-
-    for term in terms[:15]:
-
-        if not isinstance(term, dict):
-            continue
-
-        name = term.get("term", "")
-        definition = term.get("definition", "")
-
-        if not name:
-            continue
-
-        lines.append(f"- {name}: {definition}")
-
-    return "\n".join(lines)
-
-
-def _build_flashcard_context(synthesis: Dict[str, Any]) -> str:
-    """
-    Build compact context from L6 flashcards.
-
-    These are provided as semantic hints rather than copied directly
-    into the final quiz.
-    """
-
-    flashcards = synthesis.get("flashcards") or []
-
-    lines = []
-
-    for card in flashcards[:10]:
-
-        if not isinstance(card, dict):
-            continue
-
-        front = card.get("front", "")
-        back = card.get("back", "")
-
-        if not front:
-            continue
-
-        lines.append(f"- Q: {front}\n" f"  A: {back}")
-
-    return "\n".join(lines)
-
-
-# ============================================================
 # QUIZ VALIDATION
 # ============================================================
 
 
 def _validate_quiz(quiz: Any) -> list:
-    """
+    ""
     Validate and clean L7 quiz questions.
-    """
+    ""
 
     if not isinstance(quiz, list):
         return []
@@ -402,9 +195,9 @@ def _validate_quiz(quiz: Any) -> list:
 
 
 def _validate_timeline(timeline: Any) -> list:
-    """
+    ""
     Validate concept timeline entries.
-    """
+    ""
 
     if not isinstance(timeline, list):
         return []
@@ -470,9 +263,9 @@ def _validate_timeline(timeline: Any) -> list:
 
 
 def _validate_mind_map(value: Any) -> str:
-    """
+    ""
     Basic validation for text-based mind map.
-    """
+    ""
 
     if not isinstance(value, str):
         return ""
@@ -494,7 +287,7 @@ def _validate_mind_map(value: Any) -> str:
 
         value = "\n".join(lines).strip()
 
-    return value
+    return value"""
 
 
 # ============================================================
@@ -573,7 +366,7 @@ async def layer7_study_assets(
     # Sections
     # ========================================================
 
-    sections_context = _build_sections_context(
+    sections_context = build_sections_context(
         sections,
         max_chars=7000,
     )
@@ -582,17 +375,17 @@ async def layer7_study_assets(
     # L3 graph
     # ========================================================
 
-    dependency_context = _build_dependency_context(kg)
+    dependency_context = build_dependency_context(kg)
 
-    graph_context = _build_graph_context(kg)
+    graph_context = build_graph_context(kg)
 
     # ========================================================
     # L6 synthesis
     # ========================================================
 
-    key_terms_context = _build_key_terms_context(synthesis)
+    key_terms_context = build_key_terms_context(synthesis)
 
-    flashcards_context = _build_flashcard_context(synthesis)
+    flashcards_context = build_flashcard_context(synthesis)
 
     executive_summary = synthesis.get(
         "executive_summary",
@@ -603,283 +396,19 @@ async def layer7_study_assets(
     # Prompt
     # ========================================================
 
-    prompt = f"""
-You are generating study materials for a video-based learning system.
-
-The material has already been analyzed through multiple semantic layers.
-
-Use ONLY the supplied information.
-
-Do NOT invent facts, examples, people, events, statistics,
-technical details, formulas, or relationships that are not supported
-by the supplied material.
-
-IMPORTANT:
-
-The fact that a concept appears in multiple generated layers does NOT
-mean it has been independently verified.
-
-Treat the supplied material as the source representation of the video.
-
-When generating questions, make sure the answer can be supported by
-the supplied material.
-
-============================================================
-VIDEO CONTEXT
-============================================================
-
-DOMAIN:
-{domain}
-
-CONTENT TYPE:
-{content_type}
-
-DIFFICULTY:
-{difficulty}
-
-OVERALL TOPIC:
-{overall_topic}
-
-EXECUTIVE SUMMARY:
-{executive_summary}
-
-LEARNING OBJECTIVES:
-{json.dumps(
-    learning_objectives,
-    ensure_ascii=False,
-)}
-
-============================================================
-L3 KNOWLEDGE GRAPH
-============================================================
-
-IMPORTANT NODES:
-{graph_context or "No graph nodes available."}
-
-DEPENDENCY ORDER:
-{dependency_context}
-
-The dependency order represents the conceptual learning sequence.
-
-Use it when deciding which concepts should appear in easier versus
-more advanced questions.
-
-============================================================
-L6 KEY TERMS
-============================================================
-
-{key_terms_context or "No key terms available."}
-
-============================================================
-L6 FLASHCARDS
-============================================================
-
-These are existing study hints.
-
-Do NOT simply copy them.
-
-Improve or transform them into useful quiz questions.
-
-{flashcards_context or "No flashcards available."}
-
-============================================================
-L5 ANALYZED SECTIONS
-============================================================
-
-{sections_context or "No analyzed sections available."}
-
-
-============================================================
-TASK 1 — QUIZ
-============================================================
-
-Generate 5-10 multiple-choice questions.
-
-The questions should test actual understanding.
-
-Prefer questions involving:
-
-- definitions
-- conceptual distinctions
-- cause and effect
-- mechanisms
-- relationships between concepts
-- applications supported by the source
-- prerequisite understanding
-- important details that affect understanding
-
-Avoid:
-
-- trivial wording questions
-- questions about tiny incidental details
-- ambiguous questions
-- trick questions
-- facts not present in the supplied material
-- questions where multiple answers could reasonably be correct
-
-Each question MUST contain exactly four options.
-
-Only ONE option may be correct.
-
-Options MUST be labeled:
-
-A) ...
-B) ...
-C) ...
-D) ...
-
-The correct field must contain only:
-
-A
-B
-C
-or
-D
-
-Each question must include:
-
-- question
-- options
-- correct
-- explanation
-- difficulty
-- section_ref
-
-section_ref must contain the START TIMESTAMP in seconds of the
-section that best supports the answer.
-
-Difficulty distribution:
-
-- approximately 40% beginner
-- approximately 40% intermediate
-- approximately 20% advanced
-
-For beginner questions, focus on foundational concepts.
-
-For intermediate questions, test relationships and mechanisms.
-
-For advanced questions, test deeper reasoning or connections between
-concepts that are explicitly supported by the material.
-
-
-============================================================
-TASK 2 — CONCEPT TIMELINE
-============================================================
-
-Create a chronological conceptual timeline.
-
-Use the actual timestamps from the analyzed sections.
-
-Each entry should represent a meaningful concept introduced,
-developed, explained, or demonstrated.
-
-Do NOT create an entry for every tiny topic change.
-
-Prefer approximately 5-12 timeline entries depending on the length
-and complexity of the video.
-
-Each entry must contain:
-
-timestamp:
-    approximate timestamp in seconds
-
-concept:
-    meaningful concept being introduced or developed
-
-importance:
-    high | medium | low
-
-The timeline must be sorted chronologically.
-
-
-============================================================
-TASK 3 — MIND MAP
-============================================================
-
-Create a compact text-based mind map.
-
-The root should represent the central topic.
-
-Use the L3 knowledge graph and dependency order to determine the
-major branches.
-
-Use indentation to represent hierarchy.
-
-Example:
-
-Central Topic
-  Foundation
-    Concept A
-    Concept B
-  Main Mechanism
-    Concept C
-    Concept D
-  Application
-    Example A
-
-Do NOT include every graph node.
-
-Keep the mind map focused on the most important concepts.
-
-Maximum recommended depth: 4 levels.
-
-
-============================================================
-QUALITY RULES
-============================================================
-
-- Do not hallucinate.
-- Do not add external knowledge.
-- Do not create unsupported examples.
-- Do not create unsupported historical claims.
-- Do not create unsupported formulas.
-- Do not create unsupported programming code.
-- Do not turn a minor mention into a major concept.
-- Prefer concepts supported by L5 sections.
-- Prefer foundational concepts from the L3 dependency order.
-- Use timestamps from the actual sections.
-- Keep quiz questions unambiguous.
-- Ensure exactly one correct answer per question.
-- Make distractors plausible but clearly incorrect according to the
-  supplied material.
-- Explanations should explain WHY the correct answer is correct.
-
-============================================================
-OUTPUT
-============================================================
-
-Return ONLY valid JSON.
-
-{{
-    "quiz": [
-        {{
-            "question": "Question text",
-            "options": [
-                "A) Option A",
-                "B) Option B",
-                "C) Option C",
-                "D) Option D"
-            ],
-            "correct": "A",
-            "explanation": "Why this answer is correct.",
-            "difficulty": "beginner",
-            "section_ref": 0
-        }}
-    ],
-
-    "concept_timeline": [
-        {{
-            "timestamp": 0,
-            "concept": "Concept introduced",
-            "importance": "high"
-        }}
-    ],
-
-    "mind_map_text": "Central Topic\\n  Major Concept\\n    Supporting Concept"
-}}
-
-Raw JSON only.
-"""
+    prompt = build_study_assets_prompt(
+        domain=domain,
+        content_type=content_type,
+        difficulty=difficulty,
+        overall_topic=overall_topic,
+        learning_objectives=learning_objectives,
+        sections_context=sections_context,
+        graph_context=graph_context,
+        dependency_context=dependency_context,
+        key_terms_context=key_terms_context,
+        flashcards_context=flashcards_context,
+        executive_summary=executive_summary,
+    )
 
     # ========================================================
     # LLM CALL
@@ -894,6 +423,8 @@ Raw JSON only.
             json_output=True,
         )
 
+        return normalize_study_assets_result(result)
+
     except Exception as exc:
 
         logger.exception(
@@ -906,52 +437,6 @@ Raw JSON only.
             "concept_timeline": [],
             "mind_map_text": "",
         }
-
-    # ========================================================
-    # Parse
-    # ========================================================
-
-    if isinstance(result, str):
-        result = _extract_json(result)
-
-    if not isinstance(result, dict):
-
-        return {
-            "quiz": [],
-            "concept_timeline": [],
-            "mind_map_text": "",
-        }
-
-    # ========================================================
-    # Defensive defaults
-    # ========================================================
-
-    result.setdefault(
-        "quiz",
-        [],
-    )
-
-    result.setdefault(
-        "concept_timeline",
-        [],
-    )
-
-    result.setdefault(
-        "mind_map_text",
-        "",
-    )
-
-    # ========================================================
-    # Validate
-    # ========================================================
-
-    result["quiz"] = _validate_quiz(result.get("quiz"))
-
-    result["concept_timeline"] = _validate_timeline(result.get("concept_timeline"))
-
-    result["mind_map_text"] = _validate_mind_map(result.get("mind_map_text"))
-
-    return result
 
 
 # ============================================================
