@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any, Dict
 
-from features.synthesis import category_instructions
+from features.synthesis.l6_category_classifier import category_instructions
 
 from features.synthesis.l6_context_builder import (
     build_concepts_text,
@@ -11,7 +11,7 @@ from features.synthesis.l6_context_builder import (
 )
 from features.synthesis.l6_prompt import build_synthesis_prompt
 from features.synthesis.l6_validator import normalize_synthesis_result
-from llm.groq_service import LLMService
+from llm.gemini_service import GeminiService
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +21,7 @@ async def layer6_synthesis(
     sections: list,
     parsed: Dict[str, Any],
     kg: Dict[str, Any],
-    llm_service: LLMService,
+    llm_service: GeminiService,
 ) -> Dict[str, Any]:
     """
     L6 — Grounded whole-video synthesis.
@@ -121,7 +121,7 @@ async def layer6_synthesis(
     try:
         result = await llm_service.generate(
             prompt=prompt,
-            max_tokens=5000,
+            max_tokens=10000,
             temperature=0.15,
             json_output=True,
         )
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     from l2_layer import layer2_content_parse
     from l3_layer import layer3_knowledge_graph
     from l5_layer import layer5_deep_dive
-    from llm.groq_service import LLMService
+    from llm.gemini_service import GeminiService
     from storage.services.transcript_service import TranscriptService
     from video_processor.services.parser import extract_video_id
     from pipeline.chunking.chunker import TranscriptChunker
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         # =====================================================
 
         transcript_service = TranscriptService()
-        llm_service = LLMService()
+        llm_service = GeminiService()
 
         # =====================================================
         # LOAD TRANSCRIPT

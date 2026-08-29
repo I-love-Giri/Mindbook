@@ -15,9 +15,14 @@ from features.study_assets.l7_validators import normalize_study_assets_result
 
 from l6_layer import layer6_synthesis
 from llm.groq_service import LLMService
+from llm.gemini_service import GeminiService
+
 from l2_layer import layer2_content_parse
 from l3_layer import layer3_knowledge_graph
 from l5_layer import layer5_deep_dive
+from pipeline.chunking.chunker import TranscriptChunker
+from video_processor.services.parser import extract_video_id
+from storage.services.transcript_service import TranscriptService
 
 logger = logging.getLogger(__name__)
 
@@ -418,7 +423,7 @@ async def layer7_study_assets(
 
         result = await llm_service.generate(
             prompt=prompt,
-            max_tokens=2200,
+            max_tokens=3000,
             temperature=0.2,
             json_output=True,
         )
@@ -444,19 +449,17 @@ async def layer7_study_assets(
 # ============================================================
 
 
-if __name__ == "__main__":
+async def main():
 
-    import json
-
-    from storage.services.transcript_service import TranscriptService
-    from video_processor.services.parser import extract_video_id
-    from pipeline.chunking.chunker import TranscriptChunker
+    # ========================================================
+    # INPUT
+    # ========================================================
 
     url = input("Enter YouTube URL: ").strip()
 
     if not url:
         print("URL cannot be empty")
-        exit(1)
+        return
 
     video_id = extract_video_id(url)
 
@@ -490,10 +493,11 @@ if __name__ == "__main__":
     )
 
     # ========================================================
-    # LLM SERVICE
+    # LLM SERVICES
     # ========================================================
 
     llm_service = LLMService()
+    gemini_llm_service = GeminiService()
 
     # ========================================================
     # L2
@@ -504,12 +508,10 @@ if __name__ == "__main__":
     print("RUNNING L2")
     print("=" * 80)
 
-    l2_result = asyncio.run(
-        layer2_content_parse(
-            transcript=transcript,
-            video_info=video_info,
-            llm_service=llm_service,
-        )
+    l2_result = await layer2_content_parse(
+        transcript=transcript,
+        video_info=video_info,
+        llm_service=gemini_llm_service,
     )
 
     print(
@@ -529,13 +531,11 @@ if __name__ == "__main__":
     print("RUNNING L3")
     print("=" * 80)
 
-    l3_result = asyncio.run(
-        layer3_knowledge_graph(
-            layer2_result=l2_result,
-            transcript=transcript.segments,
-            video_info=video_info,
-            llm_service=llm_service,
-        )
+    l3_result = await layer3_knowledge_graph(
+        layer2_result=l2_result,
+        transcript=transcript.segments,
+        video_info=video_info,
+        llm_service=llm_service,
     )
 
     print(
@@ -585,13 +585,15 @@ if __name__ == "__main__":
 
         print(f"\nAnalyzing chunk " f"{index + 1}/{len(chunks)}...")
 
-        l5_result = asyncio.run(
-            layer5_deep_dive(
-                chunk=chunk,
-                video_info=video_info,
-                parsed=l2_result,
-                llm_service=llm_service,
-            )
+        # IMPORTANT:
+        # Do NOT use asyncio.run() here.
+        # We are already inside the main event loop.
+
+        l5_result = await layer5_deep_dive(
+            chunk=chunk,
+            video_info=video_info,
+            parsed=l2_result,
+            llm_service=llm_service,
         )
 
         # ----------------------------------------------------
@@ -627,62 +629,30 @@ if __name__ == "__main__":
     # L6
     # ========================================================
 
-    #
-    # IMPORTANT:
-    #
-    # Your current L6 implementation/function is not included
-    # in the files you posted earlier, so this CLI expects you
-    # to plug your existing L6 function into this section.
-    #
-    # For example:
-    #
-    # from l6_layer import layer6_synthesis
-    #
-    # l6_result = asyncio.run(
-    #     layer6_synthesis(
-    #         video_info=video_info,
-    #         sections=sections,
-    #         parsed=l2_result,
-    #         kg=l3_result,
-    #         llm_service=llm_service,
-    #     )
-    # )
-    #
-
-    """print("\n")
+    print("\n")
     print("=" * 80)
-    print("L6 RESULT REQUIRED")
+    print("RUNNING L6")
     print("=" * 80)
-
-    print("Your existing L6 result should be supplied here.")
-
-    print("\nFor testing L7 independently, enter " "a path to an L6 JSON file.")
-
-    l6_path = input("L6 JSON file path: ").strip()
-
-    if not l6_path:
-
-        print("L6 JSON file is required for this test.")
-
-        exit(1)"""
 
     try:
 
-        l6_result = asyncio.run(
-            layer6_synthesis(
-                video_info=video_info,
-                sections=sections,
-                parsed=l2_result,
-                kg=l3_result,
-                llm_service=llm_service,
-            )
+        # IMPORTANT:
+        # Do NOT use asyncio.run() here.
+        # GeminiService is reused inside the SAME event loop.
+
+        l6_result = await layer6_synthesis(
+            video_info=video_info,
+            sections=sections,
+            parsed=l2_result,
+            kg=l3_result,
+            llm_service=gemini_llm_service,
         )
 
     except Exception as exc:
 
-        print(f"Failed to load L6 JSON: {exc}")
+        print(f"\nL6 synthesis failed: {exc}")
 
-        exit(1)
+        raise
 
     # ========================================================
     # L7
@@ -693,14 +663,12 @@ if __name__ == "__main__":
     print("RUNNING L7")
     print("=" * 80)
 
-    l7_result = asyncio.run(
-        layer7_study_assets(
-            sections=sections,
-            synthesis=l6_result,
-            kg=l3_result,
-            parsed=l2_result,
-            llm_service=llm_service,
-        )
+    l7_result = await layer7_study_assets(
+        sections=sections,
+        synthesis=l6_result,
+        kg=l3_result,
+        parsed=l2_result,
+        llm_service=llm_service,
     )
 
     # ========================================================
@@ -791,3 +759,11 @@ if __name__ == "__main__":
             "",
         )
     )
+
+
+# ============================================================
+# ENTRY POINT
+# ============================================================
+
+if __name__ == "__main__":
+    asyncio.run(main())

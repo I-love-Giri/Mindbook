@@ -12,12 +12,19 @@ Uses:
         LLMService instance responsible for the actual LLM call.
 """
 
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+
 import json
 import asyncio
 from features.content_parse.mermaid import clean_mermaid
 from features.content_parse.prompt import build_content_parser_prompt
 from features.content_parse.result_validator import normalize_content_parse_result
-from llm.groq_service import LLMService
+from llm.gemini_service import GeminiService
 from storage.services.transcript_service import TranscriptService
 from video_processor.services.parser import extract_video_id
 from features.content_parse.transcript_sample import build_transcript_sample
@@ -26,7 +33,7 @@ from features.content_parse.transcript_sample import build_transcript_sample
 async def layer2_content_parse(
     transcript,
     video_info: dict,
-    llm_service: LLMService,
+    llm_service: GeminiService,
 ) -> dict:
 
     sample = build_transcript_sample(transcript)
@@ -69,7 +76,7 @@ async def layer2_content_parse(
 
     result = await llm_service.generate(
         prompt=prompt,
-        max_tokens=2000,
+        max_tokens=10000,
         temperature=0.2,
         json_output=True,
     )
@@ -96,7 +103,7 @@ if __name__ == "__main__":
     id = extract_video_id(url)
     print(f"Video ID: {id}")
 
-    llm_service = LLMService()
+    llm_service = GeminiService()
 
     # transcript_service = YoutubeTranscriptService()
 

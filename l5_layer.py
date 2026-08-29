@@ -54,7 +54,7 @@ async def layer5_deep_dive(
     try:
         raw = await llm_service.generate(
             prompt=prompt,
-            max_tokens=5000,
+            max_tokens=10000,
             temperature=0.2,
             json_output=True,
         )
