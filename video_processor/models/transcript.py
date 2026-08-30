@@ -5,8 +5,6 @@
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from config.prompts.services.pyd_model import SubjectClassification
-
 """
 dataclass:  decorator from Python's dataclasses module.
 
@@ -52,9 +50,9 @@ class Transcript:
     language_code: str
     language: str
     segments: list[Segment]
-    # summary: Optional[str] = None
+    summary: Optional[str] = None
     summary: Optional[dict[str, Any]] = None
-    classification: Optional[SubjectClassification] = None
+    # classification: Optional[SubjectClassification] = None
     video_info: Optional[dict[str, Any]] = (None,)
 
     @property

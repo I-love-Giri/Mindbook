@@ -12,6 +12,7 @@ from features.synthesis.l6_context_builder import (
 from features.synthesis.l6_prompt import build_synthesis_prompt
 from features.synthesis.l6_validator import normalize_synthesis_result
 from llm.gemini_service import GeminiService
+from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
 
@@ -156,6 +157,8 @@ if __name__ == "__main__":
     from l3_layer import layer3_knowledge_graph
     from l5_layer import layer5_deep_dive
     from llm.gemini_service import GeminiService
+    from llm.groq_service import LLMService
+
     from storage.services.transcript_service import TranscriptService
     from video_processor.services.parser import extract_video_id
     from pipeline.chunking.chunker import TranscriptChunker
@@ -178,6 +181,7 @@ if __name__ == "__main__":
 
         transcript_service = TranscriptService()
         llm_service = GeminiService()
+        groq_llm_service = LLMService()
 
         # =====================================================
         # LOAD TRANSCRIPT
@@ -212,7 +216,7 @@ if __name__ == "__main__":
         l2_result = await layer2_content_parse(
             transcript=transcript,
             video_info=video_info,
-            llm_service=llm_service,
+            llm_service=groq_llm_service,
         )
 
         print("\nL2 RESULT")
@@ -292,7 +296,7 @@ if __name__ == "__main__":
                 chunk=chunk,
                 video_info=video_info,
                 parsed=l2_result,
-                llm_service=llm_service,
+                llm_service=groq_llm_service,
             )
 
             # Preserve chunk metadata together with L5 output.

@@ -1,13 +1,12 @@
 from typing import Any, Dict
 
-
-def normalize_study_assets_result(result: Any) -> Dict[str, Any]:
-    """
+"""def normalize_study_assets_result(result: Any) -> Dict[str, Any]:
+    ""
     Normalize the complete L7 output.
 
     Ensures that quiz, timeline, and mind_map always exist
     in the expected format.
-    """
+    ""
 
     if not isinstance(result, dict):
         return default_study_assets_result()
@@ -20,7 +19,20 @@ def normalize_study_assets_result(result: Any) -> Dict[str, Any]:
     result["concept_timeline"] = validate_timeline(timeline)
     result["mind_map"] = validate_mind_map(mind_map)
 
-    return result
+    return result"""
+
+
+def normalize_study_assets_result(result):
+
+    if not isinstance(result, dict):
+        return default_study_assets_result()
+
+    return {
+        "quiz": validate_quiz(result.get("quiz", [])),
+        "concept_timeline": validate_timeline(result.get("concept_timeline", [])),
+        "mind_map_text": validate_mind_map_text(result.get("mind_map_text", "")),
+        "mind_map": validate_mind_map(result.get("mind_map", {})),
+    }
 
 
 def validate_quiz(quiz: Any) -> list:
@@ -114,6 +126,13 @@ def validate_timeline(timeline: Any) -> list:
         )
 
     return valid_entries
+
+
+def validate_mind_map_text(value):
+    if not isinstance(value, str):
+        return ""
+
+    return value.strip()
 
 
 def validate_mind_map(mind_map: Any) -> Dict[str, Any]:
