@@ -54,7 +54,7 @@ async def layer5_deep_dive(
     try:
         raw = await llm_service.generate(
             prompt=prompt,
-            max_tokens=10000,
+            max_tokens=6000,
             temperature=0.2,
             json_output=True,
         )
@@ -87,6 +87,8 @@ if __name__ == "__main__":
     import json
 
     from llm.groq_service import LLMService
+    from llm.gemini_service import GeminiService
+
     from storage.services.transcript_service import TranscriptService
     from video_processor.services.parser import extract_video_id
     from pipeline.chunking.chunker import TranscriptChunker
@@ -125,6 +127,7 @@ if __name__ == "__main__":
     # ---------------------------------------------------------
 
     llm_service = LLMService()
+    gemini_llm_service = GeminiService()
 
     print("\nRunning L2...\n")
 
@@ -132,7 +135,7 @@ if __name__ == "__main__":
         layer2_content_parse(
             transcript=transcript,
             video_info=video_info,
-            llm_service=llm_service,
+            llm_service=gemini_llm_service,
         )
     )
 
@@ -174,41 +177,58 @@ if __name__ == "__main__":
         )
 
     # ---------------------------------------------------------
-    # Select one chunk
+    # L5 — Analyze ALL chunks in batches of 3
     # ---------------------------------------------------------
 
-    choice = input("\nEnter chunk number to analyze [0]: ").strip()
+    BATCH_SIZE = 3
 
-    try:
-        index = int(choice) if choice else 0
-    except ValueError:
-        index = 0
+    async def process_l5_batch(batch):
+        tasks = [
+            layer5_deep_dive(
+                chunk=chunk,
+                video_info=video_info,
+                parsed=l2_result,
+                llm_service=llm_service,
+            )
+            for chunk in batch
+        ]
 
-    if index < 0 or index >= len(chunks):
-        print("Invalid chunk number")
-        exit(1)
+        return await asyncio.gather(*tasks)
 
-    chunk = chunks[index]
+    async def process_all_l5_chunks():
 
-    print("\nSELECTED CHUNK")
-    print("=" * 80)
+        all_results = []
 
-    print(json.dumps(chunk, indent=2, ensure_ascii=False))
+        for batch_start in range(0, len(chunks), BATCH_SIZE):
 
-    # ---------------------------------------------------------
-    # L5
-    # ---------------------------------------------------------
+            batch = chunks[batch_start : batch_start + BATCH_SIZE]
 
-    print("\nRunning L5...\n")
+            print(
+                f"\nRunning L5 batch: "
+                f"{batch_start + 1}-"
+                f"{batch_start + len(batch)}/{len(chunks)}"
+            )
 
-    l5_result = asyncio.run(
-        layer5_deep_dive(
-            chunk=chunk,
-            video_info=video_info,
-            parsed=l2_result,
-            llm_service=llm_service,
-        )
-    )
+            # Show which chunks are going together
+            for chunk in batch:
+                print(f"  → [{chunk['chunk_id']}] " f"{chunk.get('title', 'Untitled')}")
+
+            # Run 3 chunks concurrently
+            batch_results = await process_l5_batch(batch)
+
+            all_results.extend(batch_results)
+
+            print(
+                f"✓ Batch completed: "
+                f"{batch_start + 1}-"
+                f"{batch_start + len(batch)}"
+            )
+
+        return all_results
+
+    print("\nRunning L5 for ALL chunks...\n")
+
+    l5_results = asyncio.run(process_all_l5_chunks())
 
     # ---------------------------------------------------------
     # Output
@@ -216,13 +236,19 @@ if __name__ == "__main__":
 
     print("\n")
     print("=" * 80)
-    print("L5 RESULT")
+    print("L5 RESULTS")
     print("=" * 80)
 
-    print(
-        json.dumps(
-            l5_result,
-            indent=2,
-            ensure_ascii=False,
+    for i, result in enumerate(l5_results):
+
+        print(f"\n{'=' * 80}")
+        print(f"SECTION {i + 1}/{len(l5_results)}")
+        print(f"{'=' * 80}")
+
+        print(
+            json.dumps(
+                result,
+                indent=2,
+                ensure_ascii=False,
+            )
         )
-    )

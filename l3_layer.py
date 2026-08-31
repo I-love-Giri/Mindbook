@@ -13,44 +13,6 @@ from video_processor.services.parser import extract_video_id
 logger = logging.getLogger(__name__)
 
 
-"""def _extract_json(raw: str) -> dict:
-    ""
-    Extract a JSON object from an LLM response.
-
-    Handles responses wrapped in ```json ... ``` fences.
-    ""
-
-    if not raw:
-        return {}
-
-    if isinstance(raw, dict):
-        return raw
-
-    raw = raw.strip()
-
-    if raw.startswith("```"):
-        lines = raw.splitlines()
-
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-
-        raw = "\n".join(lines).strip()
-
-    try:
-        result = json.loads(raw)
-
-        if isinstance(result, dict):
-            return result
-
-    except json.JSONDecodeError:
-        logger.warning("Failed to parse Layer 3 LLM response as JSON")
-
-    return {}"""
-
-
 async def layer3_knowledge_graph(
     layer2_result: dict,
     transcript,
@@ -114,13 +76,6 @@ async def layer3_knowledge_graph(
             json_output=True,
         )
 
-        """
-        print("RAW LAYER 3 RESULT:")
-        print(repr(result))
-        print("MERMAID BEFORE SANITIZE:")
-        print(repr(result.get("mermaid", "")))
-        """
-
     except Exception as exc:
         logger.exception(
             "Layer 3 knowledge graph generation failed: %s",
@@ -138,20 +93,6 @@ async def layer3_knowledge_graph(
     # ---------------------------------------------------------
     # Parse response
     # ---------------------------------------------------------
-
-    """if isinstance(result, str):
-        result = _extract_json(result)
-
-    if not isinstance(result, dict):
-        return {
-            "nodes": [],
-            "edges": [],
-            "concept_tree": {},
-            "dependency_order": [],
-            "mermaid": "",
-        }
-
-    """
 
     result = normalize_knowledge_graph_result(result)
 
@@ -200,15 +141,6 @@ if __name__ == "__main__":
     # video_info = extract_chapters_and_info(video_id)
 
     # transcript = YoutubeTranscriptService().fetch_transcript(video_id)
-
-    """
-
-    layer2 = await layer2_content_parse(
-        transcript=transcript,
-        video_info=video_info,
-        llm_service=llm_service,
-    )
-    """
 
     layer3_result = asyncio.run(
         layer3_knowledge_graph(
