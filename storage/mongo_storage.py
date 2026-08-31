@@ -21,7 +21,6 @@ class MongoStorage(BaseStorage):
             "video_id": transcript.video_id,
             "language": transcript.language,
             "language_code": transcript.language_code,
-            "summary": transcript.summary,
             "video_info": transcript.video_info,
             "segments": [
                 {
@@ -59,7 +58,6 @@ class MongoStorage(BaseStorage):
             language=document["language"],
             language_code=document["language_code"],
             segments=segments,
-            summary=document.get("summary"),
             video_info=document.get("video_info"),
         )
 

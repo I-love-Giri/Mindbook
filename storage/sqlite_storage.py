@@ -9,8 +9,7 @@ class SQLiteStorage(BaseStorage):
     def __init__(self, db_path: str = "transcripts.db"):
         self.conn = sqlite3.connect(db_path)
 
-        self.conn.execute(
-            """
+        self.conn.execute("""
             CREATE TABLE IF NOT EXISTS transcripts (
                 video_id TEXT PRIMARY KEY,
                 language TEXT,
@@ -19,8 +18,7 @@ class SQLiteStorage(BaseStorage):
                 segments TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
-            """
-        )
+            """)
 
         self.conn.commit()
 
@@ -39,14 +37,13 @@ class SQLiteStorage(BaseStorage):
         self.conn.execute(
             """
             INSERT OR REPLACE INTO transcripts
-            (video_id, language, language_code, summary, segments)
-            VALUES (?, ?, ?, ?, ?)
+            (video_id, language, language_code, segments)
+            VALUES (?, ?, ?, ?)
             """,
             (
                 transcript.video_id,
                 transcript.language,
                 transcript.language_code,
-                transcript.summary,
                 segments_json,
             ),
         )
@@ -56,7 +53,7 @@ class SQLiteStorage(BaseStorage):
     def get(self, video_id: str):
         cursor = self.conn.execute(
             """
-            SELECT video_id, language, language_code, summary, segments
+            SELECT video_id, language, language_code, segments
             FROM transcripts
             WHERE video_id = ?
             """,
@@ -68,7 +65,7 @@ class SQLiteStorage(BaseStorage):
         if row is None:
             return None
 
-        video_id, language, language_code, summary, segments_json = row
+        video_id, language, language_code, segments_json = row
 
         raw_segments = json.loads(segments_json)
 
@@ -85,7 +82,6 @@ class SQLiteStorage(BaseStorage):
             video_id=video_id,
             language=language,
             language_code=language_code,
-            summary = summary,
             segments=segments,
         )
 
