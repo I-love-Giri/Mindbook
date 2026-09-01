@@ -19,14 +19,12 @@ logging.basicConfig(
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
 
-import json
-import asyncio
+"""import json
+import asyncio"""
 from features.content_parse.mermaid import clean_mermaid
 from features.content_parse.prompt import build_content_parser_prompt
 from features.content_parse.result_validator import normalize_content_parse_result
 from llm.gemini_service import GeminiService
-from storage.services.transcript_service import TranscriptService
-from video_processor.services.parser import extract_video_id
 from features.content_parse.transcript_sample import build_transcript_sample
 
 
@@ -92,7 +90,7 @@ async def layer2_content_parse(
     return result
 
 
-if __name__ == "__main__":
+"""if __name__ == "__main__":
 
     url = input("Enter the URL: ").strip()
 
@@ -100,26 +98,13 @@ if __name__ == "__main__":
         print("URL cannot be empty")
         exit(1)
 
-    id = extract_video_id(url)
-    print(f"Video ID: {id}")
+    video_id = extract_video_id(url)
+    print(f"Video ID: {video_id}")
 
-    llm_service = GeminiService()
+    l2 = ContentParseService()
 
-    # transcript_service = YoutubeTranscriptService()
-
-    # transcript = transcript_service.fetch_transcript(id)
-
-    transcript_service = TranscriptService()
-    transcript = transcript_service.get(id)
-
-    video_info = transcript.video_info
-
-    layer2_result = asyncio.run(
-        layer2_content_parse(
-            transcript=transcript,
-            video_info=video_info,
-            llm_service=llm_service,
-        )
-    )
+    layer2_result = asyncio.run(l2.get(video_id))
 
     print(json.dumps(layer2_result, indent=2))
+
+    l2.close()"""

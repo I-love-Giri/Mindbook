@@ -9,12 +9,19 @@ class MongoStorage(BaseStorage):
         uri: str = "mongodb://localhost:27017/",
         database: str = "video_processor",
         collection: str = "transcripts",
+        content_parse_collection: str = "content_parse",
     ):
         self.client = MongoClient(uri)
         self.db = self.client[database]
         self.collection = self.db[collection]
+        self.content_parse = self.db[content_parse_collection]
 
         self.collection.create_index("video_id", unique=True)
+
+        self.content_parse.create_index(
+            "video_id",
+            unique=True,
+        )
 
     def save(self, transcript: Transcript) -> None:
         document = {
@@ -60,6 +67,39 @@ class MongoStorage(BaseStorage):
             segments=segments,
             video_info=document.get("video_info"),
         )
+
+    # ---------------------------------------------------------
+    # L2 Content Parse
+    # ---------------------------------------------------------
+
+    def save_content_parse(
+        self,
+        video_id: str,
+        result: dict,
+    ) -> None:
+
+        document = {
+            "video_id": video_id,
+            "result": result,
+        }
+
+        self.content_parse.replace_one(
+            {"video_id": video_id},
+            document,
+            upsert=True,
+        )
+
+    def get_content_parse(
+        self,
+        video_id: str,
+    ) -> dict | None:
+
+        document = self.content_parse.find_one({"video_id": video_id})
+
+        if document is None:
+            return None
+
+        return document.get("result")
 
     def close(self) -> None:
         self.client.close()
