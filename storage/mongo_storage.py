@@ -10,11 +10,13 @@ class MongoStorage(BaseStorage):
         database: str = "video_processor",
         collection: str = "transcripts",
         content_parse_collection: str = "content_parse",
+        knowledge_graph_collection: str = "Knowledge_graph",
     ):
         self.client = MongoClient(uri)
         self.db = self.client[database]
         self.collection = self.db[collection]
         self.content_parse = self.db[content_parse_collection]
+        self.knowledge_graph = self.db[knowledge_graph_collection]
 
         self.collection.create_index("video_id", unique=True)
 
@@ -95,6 +97,39 @@ class MongoStorage(BaseStorage):
     ) -> dict | None:
 
         document = self.content_parse.find_one({"video_id": video_id})
+
+        if document is None:
+            return None
+
+        return document.get("result")
+
+    # ---------------------------------------------------------
+    # L3 Knowledge Parse
+    # ---------------------------------------------------------
+
+    def save_knowledge_graph(
+        self,
+        video_id: str,
+        result: dict,
+    ) -> None:
+
+        document = {
+            "video_id": video_id,
+            "result": result,
+        }
+
+        self.knowledge_graph.replace_one(
+            {"video_id": video_id},
+            document,
+            upsert=True,
+        )
+
+    def get_knowledge_graph(
+        self,
+        video_id: str,
+    ) -> dict | None:
+
+        document = self.knowledge_graph.find_one({"video_id": video_id})
 
         if document is None:
             return None
