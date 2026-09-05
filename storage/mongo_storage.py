@@ -11,17 +11,29 @@ class MongoStorage(BaseStorage):
         collection: str = "transcripts",
         content_parse_collection: str = "content_parse",
         knowledge_graph_collection: str = "Knowledge_graph",
+        deep_dive_collection: str = "deep_dive",
     ):
         self.client = MongoClient(uri)
         self.db = self.client[database]
         self.collection = self.db[collection]
         self.content_parse = self.db[content_parse_collection]
         self.knowledge_graph = self.db[knowledge_graph_collection]
+        self.deep_dive = self.db[deep_dive_collection]
 
         self.collection.create_index("video_id", unique=True)
 
         self.content_parse.create_index(
             "video_id",
+            unique=True,
+        )
+
+        self.knowledge_graph.create_index(
+            "video_id",
+            unique=True,
+        )
+
+        self.deep_dive.create_index(
+            [("video_id", 1), ("chunk_id", 1)],
             unique=True,
         )
 
@@ -130,6 +142,50 @@ class MongoStorage(BaseStorage):
     ) -> dict | None:
 
         document = self.knowledge_graph.find_one({"video_id": video_id})
+
+        if document is None:
+            return None
+
+        return document.get("result")
+
+    # ---------------------------------------------------------
+    # L5 Synthesis Parse ( DEEP SUMMARIES )
+    # ---------------------------------------------------------
+
+    def save_deep_dive(
+        self,
+        video_id: str,
+        chunk_id: int,
+        result: dict,
+    ) -> None:
+
+        document = {
+            "video_id": video_id,
+            "chunk_id": chunk_id,
+            "result": result,
+        }
+
+        self.deep_dive.replace_one(
+            {
+                "video_id": video_id,
+                "chunk_id": chunk_id,
+            },
+            document,
+            upsert=True,
+        )
+
+    def get_deep_dive(
+        self,
+        video_id: str,
+        chunk_id: int,
+    ) -> dict | None:
+
+        document = self.deep_dive.find_one(
+            {
+                "video_id": video_id,
+                "chunk_id": chunk_id,
+            }
+        )
 
         if document is None:
             return None

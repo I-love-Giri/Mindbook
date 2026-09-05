@@ -17,7 +17,7 @@ class KGService:
         self.transcript_service = TranscriptService(db=self.db)
 
         # L2 service
-        self.KG_Service = ContentParseService(db=self.db)
+        self.content_parse_service = ContentParseService(db=self.db)
 
         self.llm_service = LLMService()
 
@@ -68,7 +68,7 @@ class KGService:
             return None
 
         # 4. L2 layer
-        layer2_result = await self.KG_Service.get(video_id)
+        layer2_result = await self.content_parse_service.get(video_id)
 
         if layer2_result is None:
             return None

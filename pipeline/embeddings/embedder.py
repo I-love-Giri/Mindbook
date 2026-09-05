@@ -17,7 +17,7 @@ class EmbeddingService:
         texts = [chunk["text"] for chunk in chunks]
 
         embeddings = self.model.encode(
-            texts, batch_size=8, normalize_embeddings=True, show_progress_bar=True
+            texts, batch_size=20, normalize_embeddings=True, show_progress_bar=True
         )
 
         return embeddings.tolist()

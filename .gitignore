@@ -44,3 +44,5 @@ config
 # Qdrant data
 qdrant_data/
 
+#test files
+test_*.py
