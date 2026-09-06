@@ -33,7 +33,7 @@ class MongoStorage(BaseStorage):
         )
 
         self.deep_dive.create_index(
-            [("video_id", 1), ("chunk_id", 1)],
+            "video_id",
             unique=True,
         )
 
@@ -155,21 +155,16 @@ class MongoStorage(BaseStorage):
     def save_deep_dive(
         self,
         video_id: str,
-        chunk_id: int,
-        result: dict,
+        results: list[dict],
     ) -> None:
 
         document = {
             "video_id": video_id,
-            "chunk_id": chunk_id,
-            "result": result,
+            "results": results,
         }
 
         self.deep_dive.replace_one(
-            {
-                "video_id": video_id,
-                "chunk_id": chunk_id,
-            },
+            {"video_id": video_id},
             document,
             upsert=True,
         )
@@ -177,20 +172,14 @@ class MongoStorage(BaseStorage):
     def get_deep_dive(
         self,
         video_id: str,
-        chunk_id: int,
-    ) -> dict | None:
+    ) -> list[dict] | None:
 
-        document = self.deep_dive.find_one(
-            {
-                "video_id": video_id,
-                "chunk_id": chunk_id,
-            }
-        )
+        document = self.deep_dive.find_one({"video_id": video_id})
 
         if document is None:
             return None
 
-        return document.get("result")
+        return document.get("results")
 
     def close(self) -> None:
         self.client.close()

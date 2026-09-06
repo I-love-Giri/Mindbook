@@ -1,6 +1,5 @@
-import json
 import logging
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, List
 
 from features.deep_dive.l5_prompt import build_section_prompt
 from features.deep_dive.l5_validator import normalize_deep_dive_result
@@ -11,47 +10,82 @@ logger = logging.getLogger(__name__)
 
 
 async def layer5_deep_dive(
-    chunk: Dict[str, Any],
+    chunks: List[Dict[str, Any]],
     video_info: Dict[str, Any],
     parsed: Dict[str, Any],
     llm_service: LLMService,
-) -> Dict[str, Any]:
+) -> List[Dict[str, Any]]:
 
-    transcript_text = chunk.get("text", "").strip()
+    if not chunks:
+        return []
 
-    if not transcript_text:
-        return {
-            "blocks": [],
-            "key_concepts": [],
-            "sketch_note": {},
-            "difficulty_rating": 1,
-        }
+    # --------------------------------------------------
+    # Common L2 information
+    # --------------------------------------------------
 
     domain = parsed.get("domain", "")
-    content_type = parsed.get("content_type", "tutorial")
-    difficulty = parsed.get("difficulty", "intermediate")
-
-    section_title = (
-        chunk.get("title")
-        or parsed.get("overall_topic")
-        or video_info.get("title")
-        or "Untitled Section"
+    content_type = parsed.get(
+        "content_type",
+        "tutorial",
+    )
+    difficulty = parsed.get(
+        "difficulty",
+        "intermediate",
     )
 
-    # start_time = chunk.get("start", 0)
-    # end_time = chunk.get("end", start_time)
+    # --------------------------------------------------
+    # Prepare all chunks for ONE LLM call
+    # --------------------------------------------------
+
+    sections = []
+
+    for chunk in chunks:
+
+        transcript_text = chunk.get(
+            "text",
+            "",
+        ).strip()
+
+        if not transcript_text:
+            continue
+
+        section_title = (
+            chunk.get("title")
+            or parsed.get("overall_topic")
+            or video_info.get("title")
+            or "Untitled Section"
+        )
+
+        sections.append(
+            {
+                "chunk_id": chunk["chunk_id"],
+                "title": section_title,
+                "start_time": chunk.get("start", 0),
+                "end_time": chunk.get("end", 0),
+                "transcript": transcript_text[:6000],
+            }
+        )
+
+    if not sections:
+        return []
+
+    # --------------------------------------------------
+    # Build ONE prompt containing all chunks
+    # --------------------------------------------------
 
     prompt = build_section_prompt(
         domain=domain,
         content_type=content_type,
         difficulty=difficulty,
-        section_title=section_title,
-        start_time=chunk.get("start", 0),
-        end_time=chunk.get("end", 0),
-        transcript_text=transcript_text[:6000],
+        sections=sections,
     )
 
+    # --------------------------------------------------
+    # ONE LLM CALL
+    # --------------------------------------------------
+
     try:
+
         raw = await llm_service.generate(
             prompt=prompt,
             max_tokens=6000,
@@ -59,26 +93,20 @@ async def layer5_deep_dive(
             json_output=True,
         )
 
+        # --------------------------------------------------
+        # Validate + normalize batch response
+        # --------------------------------------------------
+
         return normalize_deep_dive_result(raw)
 
     except Exception as exc:
+
         logger.exception(
-            "L5 deep dive failed for chunk %s: %s",
-            chunk.get("chunk_id"),
+            "L5 batch failed: %s",
             exc,
         )
 
-    return {
-        "blocks": [
-            {
-                "type": "paragraph",
-                "content": "Analysis unavailable for this section.",
-            }
-        ],
-        "key_concepts": [],
-        "sketch_note": {},
-        "difficulty_rating": 3,
-    }
+        return []
 
 
 if __name__ == "__main__":
