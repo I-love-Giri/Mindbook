@@ -12,6 +12,7 @@ class MongoStorage(BaseStorage):
         content_parse_collection: str = "content_parse",
         knowledge_graph_collection: str = "Knowledge_graph",
         deep_dive_collection: str = "deep_dive",
+        synthesis_collection: str = "synthesis",
     ):
         self.client = MongoClient(uri)
         self.db = self.client[database]
@@ -19,6 +20,7 @@ class MongoStorage(BaseStorage):
         self.content_parse = self.db[content_parse_collection]
         self.knowledge_graph = self.db[knowledge_graph_collection]
         self.deep_dive = self.db[deep_dive_collection]
+        self.synthesis = self.db[synthesis_collection]
 
         self.collection.create_index("video_id", unique=True)
 
@@ -33,6 +35,11 @@ class MongoStorage(BaseStorage):
         )
 
         self.deep_dive.create_index(
+            "video_id",
+            unique=True,
+        )
+
+        self.synthesis.create_index(
             "video_id",
             unique=True,
         )
@@ -183,3 +190,36 @@ class MongoStorage(BaseStorage):
 
     def close(self) -> None:
         self.client.close()
+
+    # ---------------------------------------------------------
+    # L6 Synthesis Service
+    # ---------------------------------------------------------
+
+    def save_synthesis(
+        self,
+        video_id: str,
+        result: dict,
+    ) -> None:
+
+        document = {
+            "video_id": video_id,
+            "result": result,
+        }
+
+        self.synthesis.replace_one(
+            {"video_id": video_id},
+            document,
+            upsert=True,
+        )
+
+    def get_synthesis(
+        self,
+        video_id: str,
+    ) -> dict | None:
+
+        document = self.synthesis.find_one({"video_id": video_id})
+
+        if document is None:
+            return None
+
+        return document.get("result")
