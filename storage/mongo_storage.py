@@ -13,6 +13,7 @@ class MongoStorage(BaseStorage):
         knowledge_graph_collection: str = "Knowledge_graph",
         deep_dive_collection: str = "deep_dive",
         synthesis_collection: str = "synthesis",
+        study_assets_collection: str = "study_assets",
     ):
         self.client = MongoClient(uri)
         self.db = self.client[database]
@@ -21,6 +22,7 @@ class MongoStorage(BaseStorage):
         self.knowledge_graph = self.db[knowledge_graph_collection]
         self.deep_dive = self.db[deep_dive_collection]
         self.synthesis = self.db[synthesis_collection]
+        self.study_assets = self.db[study_assets_collection]
 
         self.collection.create_index("video_id", unique=True)
 
@@ -40,6 +42,11 @@ class MongoStorage(BaseStorage):
         )
 
         self.synthesis.create_index(
+            "video_id",
+            unique=True,
+        )
+
+        self.study_assets.create_index(
             "video_id",
             unique=True,
         )
@@ -218,6 +225,39 @@ class MongoStorage(BaseStorage):
     ) -> dict | None:
 
         document = self.synthesis.find_one({"video_id": video_id})
+
+        if document is None:
+            return None
+
+        return document.get("result")
+
+    # ---------------------------------------------------------
+    # L7 Study Assets Service
+    # ---------------------------------------------------------
+
+    def save_study_assets(
+        self,
+        video_id: str,
+        result: dict,
+    ) -> None:
+
+        document = {
+            "video_id": video_id,
+            "result": result,
+        }
+
+        self.study_assets.replace_one(
+            {"video_id": video_id},
+            document,
+            upsert=True,
+        )
+
+    def get_study_assets(
+        self,
+        video_id: str,
+    ) -> dict | None:
+
+        document = self.study_assets.find_one({"video_id": video_id})
 
         if document is None:
             return None
