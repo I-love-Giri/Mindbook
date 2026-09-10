@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from video_processor.services.parser import extract_video_id
+
 app = FastAPI()
 
 
@@ -32,7 +34,9 @@ def health_check():
 
 @app.post("/process")
 def process_video(request: VideoRequest):
+    video_id = extract_video_id(request.url)
+
     return {
-        "status": "received",
-        "url": request.url,
+        "status": "processing",
+        "video_id": video_id,
     }

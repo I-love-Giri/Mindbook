@@ -31,7 +31,7 @@ export default function Home() {
 
       const data = await response.json();
 
-      setMessage(`Backend received: ${data.url}`);
+      setMessage(`Video ID: ${data.video_id}`);
     } catch (error) {
       console.error(error);
       setMessage("Could not connect to FastAPI.");
