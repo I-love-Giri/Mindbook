@@ -46,3 +46,6 @@ qdrant_data/
 
 #test files
 test_*.py
+
+#json files
+*_pipeline.json
