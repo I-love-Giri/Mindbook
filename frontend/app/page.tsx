@@ -5,6 +5,7 @@ import { useState } from "react";
 export default function Home() {
   const [url, setUrl] = useState("");
   const [message, setMessage] = useState("");
+  const [result, setResult] = useState<any>(null);
 
   const handleGenerate = async () => {
     if (!url.trim()) {
@@ -31,10 +32,63 @@ export default function Home() {
 
       const data = await response.json();
 
-      setMessage(`Video ID: ${data.video_id}`);
+      setMessage("Processing started...");
+
+      checkStatus(data.video_id);
     } catch (error) {
       console.error(error);
       setMessage("Could not connect to FastAPI.");
+    }
+  };
+
+  const checkStatus = async (videoId: string) => {
+    const statusUrl = `http://127.0.0.1:8000/status/${videoId}`;
+
+    console.log("Checking status:", statusUrl);
+
+    const response = await fetch(statusUrl);
+
+    console.log("Status response:", response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.log("Status error:", errorText);
+
+      throw new Error("Could not check status");
+    }
+
+    const data = await response.json();
+
+    console.log("Status data:", data);
+
+    setMessage(`Status: ${data.status}`);
+
+    if (data.status === "processing") {
+      setTimeout(() => {
+        checkStatus(videoId);
+      }, 2000);
+    }
+
+    if (data.status === "completed") {
+      setMessage("Your MindBook is ready! 🎉");
+
+      const resultResponse = await fetch(
+        `http://127.0.0.1:8000/result/${videoId}`
+      );
+
+      if (!resultResponse.ok) {
+        throw new Error("Could not fetch MindBook result");
+      }
+
+      const result = await resultResponse.json();
+
+      console.log("MindBook Result:", result);
+
+      setResult(result);
+    }
+
+    if (data.status === "failed") {
+      setMessage("Processing failed ❌");
     }
   };
 
@@ -86,6 +140,105 @@ export default function Home() {
 
           {/* Backend Response */}
           {message && <p className="mt-4 text-gray-600">{message}</p>}
+
+          {result && (
+            <div className="mt-12 w-full max-w-5xl text-left space-y-6">
+              {/* Header */}
+              <div className="rounded-2xl border p-6">
+                <p className="text-sm text-gray-500">MindBook</p>
+
+                <h2 className="mt-2 text-3xl font-bold">
+                  {result.content.overall_topic}
+                </h2>
+
+                <div className="mt-4 flex gap-3">
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                    {result.content.content_type}
+                  </span>
+
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                    {result.content.difficulty}
+                  </span>
+
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                    {result.content.domain}
+                  </span>
+                </div>
+              </div>
+
+              {/* Executive Summary */}
+              <div className="rounded-2xl border p-6">
+                <h3 className="text-xl font-semibold">⚡ Executive Summary</h3>
+
+                <p className="mt-3 leading-7 text-gray-600">
+                  {result.synthesis.executive_summary}
+                </p>
+              </div>
+
+              {/* Learning Objectives */}
+              <div className="rounded-2xl border p-6">
+                <h3 className="text-xl font-semibold">
+                  🎯 Learning Objectives
+                </h3>
+
+                <ul className="mt-4 space-y-3">
+                  {result.content.learning_objectives.map(
+                    (objective: string, index: number) => (
+                      <li key={index} className="flex gap-3">
+                        <span>✓</span>
+                        <span className="text-gray-600">{objective}</span>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+
+              {/* Topics */}
+              <div className="rounded-2xl border p-6">
+                <h3 className="text-xl font-semibold">📚 Topics Covered</h3>
+
+                <div className="mt-4 space-y-4">
+                  {result.content.topics.map((topic: any, index: number) => (
+                    <div key={index} className="rounded-xl bg-gray-50 p-4">
+                      <h4 className="font-medium">{topic.title}</h4>
+
+                      <p className="mt-1 text-sm leading-6 text-gray-600">
+                        {topic.summary}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Complete Guide */}
+              <div className="rounded-2xl border p-6">
+                <h3 className="text-xl font-semibold">📖 Complete Guide</h3>
+
+                <div className="mt-4 whitespace-pre-line leading-7 text-gray-600">
+                  {result.synthesis.complete_guide}
+                </div>
+              </div>
+
+              {/* FAQ */}
+              <div className="rounded-2xl border p-6">
+                <h3 className="text-xl font-semibold">
+                  ❓ Frequently Asked Questions
+                </h3>
+
+                <div className="mt-4 space-y-5">
+                  {result.synthesis.faq.map((item: any, index: number) => (
+                    <div key={index}>
+                      <h4 className="font-medium">{item.q}</h4>
+
+                      <p className="mt-1 text-sm leading-6 text-gray-600">
+                        {item.a}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </section>
 
         {/* Features */}
