@@ -7,6 +7,14 @@ export default function Home() {
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<any>(null);
 
+  const [selectedAnswers, setSelectedAnswers] = useState<{
+    [key: number]: string;
+  }>({});
+
+  const [checkedAnswers, setCheckedAnswers] = useState<{
+    [key: number]: boolean;
+  }>({});
+
   const handleGenerate = async () => {
     if (!url.trim()) {
       setMessage("Please enter a YouTube URL.");
@@ -143,24 +151,24 @@ export default function Home() {
 
           {result && (
             <div className="mt-12 w-full max-w-5xl text-left space-y-6">
-              {/* Header */}
-              <div className="rounded-2xl border p-6">
-                <p className="text-sm text-gray-500">MindBook</p>
+              {/* MindBook Header */}
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-gray-500">MindBook</p>
 
-                <h2 className="mt-2 text-3xl font-bold">
+                <h2 className="mt-2 text-3xl font-bold text-gray-900">
                   {result.content.overall_topic}
                 </h2>
 
-                <div className="mt-4 flex gap-3">
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
                     {result.content.content_type}
                   </span>
 
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
                     {result.content.difficulty}
                   </span>
 
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm">
+                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
                     {result.content.domain}
                   </span>
                 </div>
@@ -235,6 +243,327 @@ export default function Home() {
                       </p>
                     </div>
                   ))}
+                </div>
+              </div>
+
+              {/* Knowledge Graph */}
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="text-xl font-semibold">🕸️ Knowledge Graph</h3>
+
+                {/* Nodes */}
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900">Concepts</h4>
+
+                  <div className="mt-3 flex flex-wrap gap-3">
+                    {result.knowledge_graph.nodes.map(
+                      (node: any, index: number) => (
+                        <span
+                          key={index}
+                          className="rounded-xl border bg-gray-50 px-4 py-2 text-sm text-gray-700"
+                        >
+                          {node.label || node.name || node.id}
+                        </span>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {/* Relationships */}
+                <div className="mt-8">
+                  <h4 className="font-medium text-gray-900">Relationships</h4>
+
+                  <div className="mt-3 space-y-3">
+                    {result.knowledge_graph.edges.map(
+                      (edge: any, index: number) => {
+                        const fromNode = result.knowledge_graph.nodes.find(
+                          (node: any) => node.id === edge.from
+                        );
+
+                        const toNode = result.knowledge_graph.nodes.find(
+                          (node: any) => node.id === edge.to
+                        );
+
+                        return (
+                          <div
+                            key={index}
+                            className="rounded-xl bg-gray-50 px-4 py-3 text-sm"
+                          >
+                            <span className="font-medium text-gray-900">
+                              {fromNode?.label || edge.from}
+                            </span>
+
+                            <span className="mx-2 text-gray-400">→</span>
+
+                            <span className="text-gray-500">
+                              {edge.relation}
+                            </span>
+
+                            <span className="mx-2 text-gray-400">→</span>
+
+                            <span className="font-medium text-gray-900">
+                              {toNode?.label || edge.to}
+                            </span>
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Deep Dive */}
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="text-xl font-semibold">🔍 Deep Dive</h3>
+
+                <div className="mt-6 space-y-6">
+                  {result.deep_dive.map((chunk: any, index: number) => (
+                    <div
+                      key={chunk.chunk_id ?? index}
+                      className="rounded-xl bg-gray-50 p-5"
+                    >
+                      {/* Chunk Header */}
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-semibold">
+                          Chunk {chunk.chunk_id}
+                        </h4>
+
+                        <span className="rounded-full bg-white px-3 py-1 text-sm">
+                          Difficulty: {chunk.result.difficulty_rating}/5
+                        </span>
+                      </div>
+
+                      {/* Explanation Blocks */}
+                      <div className="mt-5 space-y-5">
+                        {chunk.result.blocks.map(
+                          (block: any, blockIndex: number) => (
+                            <div key={blockIndex}>
+                              {block.type === "heading" && (
+                                <h5 className="font-medium text-gray-900">
+                                  {block.content}
+                                </h5>
+                              )}
+
+                              {block.type === "paragraph" && (
+                                <p className="mt-2 leading-7 text-gray-600">
+                                  {block.content}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      {/* Key Concepts */}
+                      {chunk.result.key_concepts?.length > 0 && (
+                        <div className="mt-6">
+                          <h5 className="font-medium">💡 Key Concepts</h5>
+
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {chunk.result.key_concepts.map(
+                              (concept: string, conceptIndex: number) => (
+                                <span
+                                  key={conceptIndex}
+                                  className="rounded-full bg-white px-3 py-1 text-sm text-gray-700"
+                                >
+                                  {concept}
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Sketch Note */}
+                      {chunk.result.sketch_note && (
+                        <div className="mt-6 rounded-xl bg-white p-4">
+                          <h5 className="font-medium">
+                            📝 {chunk.result.sketch_note.title}
+                          </h5>
+
+                          <p className="mt-2 text-sm text-gray-500">
+                            {chunk.result.sketch_note.subtitle}
+                          </p>
+
+                          <ul className="mt-3 space-y-2">
+                            {chunk.result.sketch_note.boxes?.map(
+                              (box: string, boxIndex: number) => (
+                                <li
+                                  key={boxIndex}
+                                  className="text-sm text-gray-600"
+                                >
+                                  • {box}
+                                </li>
+                              )
+                            )}
+                          </ul>
+
+                          <p className="mt-4 text-sm leading-6 text-gray-600">
+                            <strong>Takeaway:</strong>{" "}
+                            {chunk.result.sketch_note.takeaway}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Study Assets */}
+              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+                <h3 className="text-xl font-semibold">🎯 Study Assets</h3>
+
+                {/* Quiz */}
+                <div className="mt-6">
+                  <h4 className="font-medium text-gray-900">📝 Quiz</h4>
+
+                  <div className="mt-4 space-y-5">
+                    {result.study_assets.quiz.map(
+                      (question: any, index: number) => {
+                        const selected = selectedAnswers[index];
+                        const checked = checkedAnswers[index];
+
+                        const isCorrect = selected === question.correct;
+
+                        return (
+                          <div
+                            key={index}
+                            className="rounded-xl bg-gray-50 p-5"
+                          >
+                            {/* Question */}
+                            <div className="flex items-start justify-between gap-4">
+                              <h5 className="font-medium">
+                                {index + 1}. {question.question}
+                              </h5>
+
+                              <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs">
+                                {question.difficulty}
+                              </span>
+                            </div>
+
+                            {/* Options */}
+                            <div className="mt-4 space-y-2">
+                              {question.options.map(
+                                (option: string, optionIndex: number) => {
+                                  const optionLetter = option.split(")")[0];
+
+                                  const isSelected = selected === optionLetter;
+
+                                  return (
+                                    <button
+                                      key={optionIndex}
+                                      onClick={() =>
+                                        setSelectedAnswers((prev) => ({
+                                          ...prev,
+                                          [index]: optionLetter,
+                                        }))
+                                      }
+                                      className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition ${
+                                        isSelected
+                                          ? "border-black bg-white"
+                                          : "border-gray-200 bg-white hover:border-gray-400"
+                                      }`}
+                                    >
+                                      {option}
+                                    </button>
+                                  );
+                                }
+                              )}
+                            </div>
+
+                            {/* Check Answer */}
+                            <button
+                              disabled={!selected}
+                              onClick={() =>
+                                setCheckedAnswers((prev) => ({
+                                  ...prev,
+                                  [index]: true,
+                                }))
+                              }
+                              className="mt-4 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
+                            >
+                              Check Answer
+                            </button>
+
+                            {/* Result */}
+                            {checked && (
+                              <div className="mt-4 rounded-lg bg-white p-4">
+                                <p
+                                  className={`font-medium ${
+                                    isCorrect
+                                      ? "text-green-600"
+                                      : "text-red-600"
+                                  }`}
+                                >
+                                  {isCorrect ? "✅ Correct!" : "❌ Wrong!"}
+                                </p>
+
+                                {!isCorrect && (
+                                  <p className="mt-2 text-sm text-gray-600">
+                                    Correct answer:{" "}
+                                    <strong>{question.correct}</strong>
+                                  </p>
+                                )}
+
+                                <p className="mt-2 text-sm leading-6 text-gray-600">
+                                  {question.explanation}
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      }
+                    )}
+                  </div>
+
+                  {/* Reset */}
+                  <button
+                    onClick={() => {
+                      setSelectedAnswers({});
+                      setCheckedAnswers({});
+                    }}
+                    className="mt-6 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
+                  >
+                    Reset Quiz
+                  </button>
+                </div>
+
+                {/* Concept Timeline */}
+                <div className="mt-10">
+                  <h4 className="font-medium text-gray-900">
+                    ⏱️ Concept Timeline
+                  </h4>
+
+                  <div className="mt-4 space-y-3">
+                    {result.study_assets.concept_timeline.map(
+                      (item: any, index: number) => (
+                        <div
+                          key={index}
+                          className="flex items-center gap-4 rounded-xl bg-gray-50 p-4"
+                        >
+                          <span className="rounded-lg bg-white px-3 py-2 text-sm font-medium">
+                            {item.timestamp}s
+                          </span>
+
+                          <div className="flex-1">
+                            <p className="font-medium">{item.concept}</p>
+
+                            <p className="text-sm text-gray-500">
+                              Importance: {item.importance}
+                            </p>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+
+                {/* Mind Map */}
+                <div className="mt-10">
+                  <h4 className="font-medium text-gray-900">🗺️ Mind Map</h4>
+
+                  <pre className="mt-4 overflow-x-auto rounded-xl bg-gray-50 p-5 text-sm leading-7 text-gray-700">
+                    {result.study_assets.mind_map_text}
+                  </pre>
                 </div>
               </div>
             </div>
