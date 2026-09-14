@@ -561,9 +561,44 @@ export default function Home() {
                 <div className="mt-10">
                   <h4 className="font-medium text-gray-900">🗺️ Mind Map</h4>
 
-                  <pre className="mt-4 overflow-x-auto rounded-xl bg-gray-50 p-5 text-sm leading-7 text-gray-700">
-                    {result.study_assets.mind_map_text}
-                  </pre>
+                  <div className="mt-4 rounded-xl bg-gray-50 p-6">
+                    <div className="space-y-3">
+                      {result.study_assets.mind_map_text
+                        .split("\n")
+                        .map((line: string, index: number) => {
+                          const trimmed = line.trim();
+
+                          if (!trimmed) return null;
+
+                          const spaces = line.length - line.trimStart().length;
+                          const level = Math.floor(spaces / 2);
+
+                          return (
+                            <div
+                              key={index}
+                              style={{
+                                marginLeft: `${level * 32}px`,
+                              }}
+                              className={`rounded-lg border bg-white px-4 py-3 ${
+                                level === 0
+                                  ? "text-lg font-bold"
+                                  : level === 1
+                                  ? "font-semibold"
+                                  : "text-sm text-gray-600"
+                              }`}
+                            >
+                              {level > 0 && (
+                                <span className="mr-2 text-gray-400">
+                                  {level === 1 ? "└─" : "•"}
+                                </span>
+                              )}
+
+                              {trimmed}
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

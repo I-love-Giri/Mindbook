@@ -10,9 +10,29 @@ from storage.services.synthesis_service import SynthesisService
 from test_new_notes import run_pipeline
 from video_processor.services.parser import extract_video_id
 
-app = FastAPI()
+from pipeline.embeddings.embedder import EmbeddingService
+from pipeline.vectorstore.qdrant_store import QdrantStore
+from pipeline.retrieval.retriever import Retriever
+from pipeline.rag.context_builder import ContextBuilder
+from pipeline.rag.generator import Generator
 
 processing_status = {}
+
+
+app = FastAPI()
+
+embedding_service = EmbeddingService()
+
+vector_store = QdrantStore()
+
+retriever = Retriever(
+    embedding_service=embedding_service,
+    vector_store=vector_store,
+)
+
+context_builder = ContextBuilder()
+
+generator = Generator()
 
 
 # Allow requests from Next.js frontend
@@ -30,6 +50,11 @@ app.add_middleware(
 
 class VideoRequest(BaseModel):
     url: str
+
+
+class AskRequest(BaseModel):
+    video_id: str
+    question: str
 
 
 def test_background_task(video_id: str):
@@ -118,3 +143,29 @@ async def get_result(video_id: str):
         deep_dive_service.close()
         synthesis_service.close()
         study_assets_service.close()
+
+
+@app.post("/ask")
+def ask_question(request: AskRequest):
+
+    retrieved_chunks = retriever.retrieve(
+        request.question,
+        limit=5,
+    )
+
+    # Filter current video only
+    retrieved_chunks = [
+        chunk for chunk in retrieved_chunks if chunk["video_id"] == request.video_id
+    ]
+
+    if not retrieved_chunks:
+        return {"answer": "No relevant information found."}
+
+    context = context_builder.build(retrieved_chunks)
+
+    answer = generator.generate(
+        question=request.question,
+        context=context,
+    )
+
+    return {"answer": answer}

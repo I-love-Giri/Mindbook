@@ -109,7 +109,7 @@ async def layer5_deep_dive(
         return []
 
 
-if __name__ == "__main__":
+"""if __name__ == "__main__":
 
     import asyncio
     import json
@@ -280,3 +280,4 @@ if __name__ == "__main__":
                 ensure_ascii=False,
             )
         )
+"""

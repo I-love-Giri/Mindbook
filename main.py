@@ -34,7 +34,7 @@ if __name__ == "__main__":
 
     store = QdrantStore()
 
-    store.delete_collection()
+    # store.delete_collection()
 
     store.upsert(result, vectors)
 
