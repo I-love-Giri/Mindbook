@@ -71,7 +71,7 @@ def health_check():
 
 async def background_process(video_id: str):
     try:
-        await run_pipeline(video_id)
+        await run_pipeline(video_id, vector_store)
 
         processing_status[video_id] = "completed"
 

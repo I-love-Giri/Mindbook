@@ -4,6 +4,7 @@ from cache.memory_cache import MemoryCache
 from l5_layer import layer5_deep_dive
 from llm.groq_service import LLMService
 from pipeline.chunking.chunker import TranscriptChunker
+from pipeline.rag.rag_index_service import RAGIndexService
 from storage.mongo_storage import MongoStorage
 from storage.services.ContentParseService import ContentParseService
 from storage.services.transcript_service import TranscriptService
@@ -13,7 +14,11 @@ class DeepDiveService:
 
     BATCH_SIZE = 3
 
-    def __init__(self, db: Optional[MongoStorage] = None):
+    def __init__(
+        self,
+        db: Optional[MongoStorage] = None,
+        rag_index_service: Optional[RAGIndexService] = None,
+    ):
 
         self.cache = MemoryCache()
         self.db = db or MongoStorage()
@@ -22,6 +27,7 @@ class DeepDiveService:
         self.content_parse_service = ContentParseService(db=self.db)
 
         self.llm_service = LLMService()
+        self.rag_index_service = rag_index_service
 
     # --------------------------------------------------
     # Save complete L5 result for one video
@@ -126,6 +132,8 @@ class DeepDiveService:
 
         print(f"\nGenerated {len(chunks)} chunks")
 
+        self.rag_index_service.index_chunks(chunks)
+
         # --------------------------------------------------
         # 7. Process chunks in REAL batches
         # --------------------------------------------------
@@ -190,4 +198,5 @@ class DeepDiveService:
     # --------------------------------------------------
 
     def close(self):
+        self.rag_index_service.close()
         self.db.close()

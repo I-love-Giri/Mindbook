@@ -79,3 +79,6 @@ class QdrantStore:
     def delete_collection(self):
 
         self.client.delete_collection(self.collection_name)
+
+    def close(self):
+        self.client.close()
