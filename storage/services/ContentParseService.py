@@ -2,7 +2,7 @@ from typing import Optional
 
 from cache.memory_cache import MemoryCache
 from l2_layer import layer2_content_parse
-from llm.gemini_service import GeminiService
+from llm.groq_service import LLMService
 from storage.mongo_storage import MongoStorage
 from storage.services.transcript_service import TranscriptService
 
@@ -15,7 +15,7 @@ class ContentParseService:
 
         self.transcript_service = TranscriptService(db=self.db)
 
-        self.llm_service = GeminiService()
+        self.llm_service = LLMService()
 
     def save(
         self,
