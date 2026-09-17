@@ -7,6 +7,7 @@ from storage.services.KG_Service import KGService
 from storage.services.deep_dive_service import DeepDiveService
 from storage.services.study_assets_service import StudyAssetsService
 from storage.services.synthesis_service import SynthesisService
+
 from test_new_notes import run_pipeline
 from video_processor.services.parser import extract_video_id
 
@@ -18,24 +19,55 @@ from pipeline.rag.generator import Generator
 
 processing_status = {}
 
-
 app = FastAPI()
 
-embedding_service = EmbeddingService()
 
+# --------------------------------------------------
+# Qdrant
+# --------------------------------------------------
+
+# One shared Qdrant client for the whole FastAPI app.
+# It is used by both /process and /ask.
 vector_store = QdrantStore()
 
-retriever = Retriever(
-    embedding_service=embedding_service,
-    vector_store=vector_store,
-)
+
+# --------------------------------------------------
+# RAG components
+# --------------------------------------------------
 
 context_builder = ContextBuilder()
-
 generator = Generator()
 
 
-# Allow requests from Next.js frontend
+# Embedding model and Retriever are created lazily.
+# This prevents Qwen from loading when FastAPI starts.
+
+embedding_service = None
+retriever = None
+
+
+def get_retriever():
+    global embedding_service, retriever
+
+    if retriever is None:
+        print("Loading embedding model...")
+
+        embedding_service = EmbeddingService()
+
+        retriever = Retriever(
+            embedding_service=embedding_service,
+            vector_store=vector_store,
+        )
+
+        print("Embedding model loaded.")
+
+    return retriever
+
+
+# --------------------------------------------------
+# CORS
+# --------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -48,6 +80,11 @@ app.add_middleware(
 )
 
 
+# --------------------------------------------------
+# Request models
+# --------------------------------------------------
+
+
 class VideoRequest(BaseModel):
     url: str
 
@@ -57,8 +94,9 @@ class AskRequest(BaseModel):
     question: str
 
 
-def test_background_task(video_id: str):
-    print(f"Background processing started for {video_id}")
+# --------------------------------------------------
+# Health
+# --------------------------------------------------
 
 
 @app.get("/health")
@@ -69,15 +107,33 @@ def health_check():
     }
 
 
+# --------------------------------------------------
+# Background processing
+# --------------------------------------------------
+
+
 async def background_process(video_id: str):
     try:
-        await run_pipeline(video_id, vector_store)
+        print(f"Pipeline started for {video_id}")
+
+        await run_pipeline(
+            video_id,
+            vector_store,
+        )
 
         processing_status[video_id] = "completed"
 
+        print(f"Pipeline completed for {video_id}")
+
     except Exception as e:
         processing_status[video_id] = "failed"
+
         print(f"Pipeline failed for {video_id}: {e}")
+
+
+# --------------------------------------------------
+# Process video
+# --------------------------------------------------
 
 
 @app.post("/process")
@@ -89,12 +145,20 @@ def process_video(
 
     processing_status[video_id] = "processing"
 
-    background_tasks.add_task(background_process, video_id)
+    background_tasks.add_task(
+        background_process,
+        video_id,
+    )
 
     return {
         "status": "processing",
         "video_id": video_id,
     }
+
+
+# --------------------------------------------------
+# Processing status
+# --------------------------------------------------
 
 
 @app.get("/status/{video_id}")
@@ -113,8 +177,14 @@ def get_status(video_id: str):
     }
 
 
+# --------------------------------------------------
+# Get complete result
+# --------------------------------------------------
+
+
 @app.get("/result/{video_id}")
 async def get_result(video_id: str):
+
     content_service = ContentParseService()
     kg_service = KGService()
     deep_dive_service = DeepDiveService()
@@ -123,9 +193,13 @@ async def get_result(video_id: str):
 
     try:
         content = await content_service.get(video_id)
+
         knowledge_graph = await kg_service.get(video_id)
+
         deep_dive = await deep_dive_service.get(video_id)
+
         synthesis = await synthesis_service.get(video_id)
+
         study_assets = await study_assets_service.get(video_id)
 
         return {
@@ -145,15 +219,23 @@ async def get_result(video_id: str):
         study_assets_service.close()
 
 
+# --------------------------------------------------
+# Ask question using RAG
+# --------------------------------------------------
+
+
 @app.post("/ask")
 def ask_question(request: AskRequest):
+
+    # Embedding model loads only when /ask is actually called.
+    retriever = get_retriever()
 
     retrieved_chunks = retriever.retrieve(
         request.question,
         limit=5,
     )
 
-    # Filter current video only
+    # Keep only chunks belonging to the current video.
     retrieved_chunks = [
         chunk for chunk in retrieved_chunks if chunk["video_id"] == request.video_id
     ]

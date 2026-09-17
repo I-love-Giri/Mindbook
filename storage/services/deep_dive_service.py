@@ -198,5 +198,7 @@ class DeepDiveService:
     # --------------------------------------------------
 
     def close(self):
-        self.rag_index_service.close()
+        if self.rag_index_service is not None:
+            self.rag_index_service.close()
+
         self.db.close()
