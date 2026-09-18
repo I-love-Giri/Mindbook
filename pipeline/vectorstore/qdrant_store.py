@@ -2,7 +2,14 @@ from typing import List, Dict
 import uuid
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import (
+    Distance,
+    VectorParams,
+    PointStruct,
+    Filter,
+    FieldCondition,
+    MatchValue,
+)
 
 
 class QdrantStore:
@@ -70,10 +77,24 @@ class QdrantStore:
             collection_name=self.collection_name, points=points, wait=True
         )
 
-    def search(self, query_vector: List[float], limit: int = 5):
-
+    def search(
+        self,
+        query_vector: List[float],
+        video_id: str,
+        limit: int = 5,
+    ):
         return self.client.query_points(
-            collection_name=self.collection_name, query=query_vector, limit=limit
+            collection_name=self.collection_name,
+            query=query_vector,
+            query_filter=Filter(
+                must=[
+                    FieldCondition(
+                        key="video_id",
+                        match=MatchValue(value=video_id),
+                    )
+                ]
+            ),
+            limit=limit,
         ).points
 
     def delete_collection(self):

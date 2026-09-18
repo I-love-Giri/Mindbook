@@ -231,14 +231,10 @@ def ask_question(request: AskRequest):
     retriever = get_retriever()
 
     retrieved_chunks = retriever.retrieve(
-        request.question,
+        query=request.question,
+        video_id=request.video_id,
         limit=5,
     )
-
-    # Keep only chunks belonging to the current video.
-    retrieved_chunks = [
-        chunk for chunk in retrieved_chunks if chunk["video_id"] == request.video_id
-    ]
 
     if not retrieved_chunks:
         return {"answer": "No relevant information found."}

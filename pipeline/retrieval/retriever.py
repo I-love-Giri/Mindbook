@@ -11,11 +11,20 @@ class Retriever:
         self.embedding_service = embedding_service
         self.vector_store = vector_store
 
-    def retrieve(self, query: str, limit: int = 5) -> List[dict]:
+    def retrieve(
+        self,
+        query: str,
+        video_id: str,
+        limit: int = 5,
+    ) -> List[dict]:
 
         query_vector = self.embedding_service.embed_query(query)
 
-        results = self.vector_store.search(query_vector=query_vector, limit=limit)
+        results = self.vector_store.search(
+            query_vector=query_vector,
+            video_id=video_id,
+            limit=limit,
+        )
 
         return [
             {
