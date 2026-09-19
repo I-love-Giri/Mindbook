@@ -12,7 +12,7 @@ from storage.services.transcript_service import TranscriptService
 
 class DeepDiveService:
 
-    BATCH_SIZE = 3
+    BATCH_SIZE = 1
 
     def __init__(
         self,

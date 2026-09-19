@@ -6,6 +6,11 @@ export default function Home() {
   const [url, setUrl] = useState("");
   const [message, setMessage] = useState("");
   const [result, setResult] = useState<any>(null);
+  const [videoId, setVideoId] = useState("");
+  const [question, setQuestion] = useState("");
+  const [answer, setAnswer] = useState("");
+  const [asking, setAsking] = useState(false);
+  const [askError, setAskError] = useState("");
 
   const [selectedAnswers, setSelectedAnswers] = useState<{
     [key: number]: string;
@@ -40,12 +45,55 @@ export default function Home() {
 
       const data = await response.json();
 
+      setVideoId(data.video_id);
+
       setMessage("Processing started...");
 
       checkStatus(data.video_id);
     } catch (error) {
       console.error(error);
       setMessage("Could not connect to FastAPI.");
+    }
+  };
+
+  const handleAsk = async () => {
+    if (!question.trim()) {
+      return;
+    }
+
+    if (!videoId) {
+      setAskError("Please generate a MindBook first.");
+      return;
+    }
+
+    setAsking(true);
+    setAnswer("");
+    setAskError("");
+
+    try {
+      const response = await fetch("http://127.0.0.1:8000/ask", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          video_id: videoId,
+          question: question,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to get answer");
+      }
+
+      const data = await response.json();
+
+      setAnswer(data.answer);
+    } catch (error) {
+      console.error(error);
+      setAskError("Could not get an answer.");
+    } finally {
+      setAsking(false);
     }
   };
 
@@ -631,6 +679,50 @@ export default function Home() {
             </p>
           </div>
         </section>
+
+        {/* Ask AI / RAG */}
+        <div className="rounded-2xl border bg-white p-6 shadow-sm">
+          <h3 className="text-xl font-semibold">💬 Ask about this video</h3>
+
+          <p className="mt-2 text-sm text-gray-500">
+            Ask questions about the concepts explained in this video.
+          </p>
+
+          <div className="mt-5 flex gap-3">
+            <input
+              type="text"
+              placeholder="e.g. What is majority voting?"
+              value={question}
+              onChange={(event) => setQuestion(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  handleAsk();
+                }
+              }}
+              className="flex-1 rounded-xl border border-gray-300 px-5 py-3 outline-none focus:border-black"
+            />
+
+            <button
+              onClick={handleAsk}
+              disabled={asking || !question.trim()}
+              className="rounded-xl bg-black px-6 py-3 font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
+            >
+              {asking ? "Thinking..." : "Ask"}
+            </button>
+          </div>
+
+          {askError && <p className="mt-4 text-sm text-red-600">{askError}</p>}
+
+          {answer && (
+            <div className="mt-6 rounded-xl bg-gray-50 p-5">
+              <h4 className="font-medium">Answer</h4>
+
+              <p className="mt-3 whitespace-pre-line leading-7 text-gray-700">
+                {answer}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
     </main>
   );
