@@ -2,34 +2,36 @@ from features.deep_dive.l5_category_classifier import classify_content_category
 
 EXAMPLE_POLICY = {
     "code": """
-Include a code example ONLY when the transcript explicitly discusses
-code, syntax, commands, APIs, implementation, or a programming pattern.
+Include a code snippet ONLY if the transcript explicitly discusses
+code, syntax, commands, APIs, tools, or implementation.
 
 Do NOT invent code for a conceptual explanation.
 
-If code is genuinely supported by the transcript:
-- Explain what it does.
-- Explain the important design decision.
-- Mention expected behavior/output when supported.
-- Do not pretend reconstructed code is exact source code.
+When code is included:
+- Explain what the code does.
+- Explain the important logic.
+- Explain the expected result when supported.
+- Do not pretend reconstructed code is the exact source code.
 """,
     "quant": """
-Include a worked numerical or formula example ONLY when it helps
-explain the concept.
+Include a numerical or formula-based example when it genuinely helps
+the learner understand the concept.
 
-Use examples that are directly supported by the transcript or are
-simple applications of the exact concept being explained.
+Use examples supported by the transcript or simple applications of the
+exact concept being explained.
 
-Never use programming code blocks.
+Explain the reasoning behind the calculation, not just the answer.
+
+Do not use programming code blocks for mathematical explanations.
 """,
     "narrative": """
-Prioritize explanation over examples.
+Prioritize clear explanation, intuition, reasoning, and understanding.
 
-Use an analogy, comparison, timeline, or illustrative case ONLY when
-it genuinely improves understanding.
+Use an analogy, comparison, timeline, or illustrative example only
+when it genuinely improves understanding.
 
-Do not manufacture events, statistics, quotations, motivations,
-examples, or historical details that are not supported by the source.
+Do not invent facts, events, statistics, quotations, motivations,
+or examples that are not supported by the transcript.
 """,
 }
 
@@ -46,82 +48,50 @@ def build_section_prompt(
         content_type,
     )
 
-    example_policy = EXAMPLE_POLICY[category]
-
-    if category == "code":
-
-        block_types = """
-Allowed block types:
-
-- heading
-- paragraph
-- code
-- table
-- callout
-"""
-
-    else:
-
-        block_types = """
-Allowed block types:
-
-- heading
-- paragraph
-- table
-- callout
-"""
+    example_policy = EXAMPLE_POLICY.get(
+        category,
+        EXAMPLE_POLICY["narrative"],
+    )
 
     # --------------------------------------------------
-    # Build transcript for ALL chunks
+    # Build transcript context
     # --------------------------------------------------
 
     sections_text = ""
 
     for section in sections:
-
         sections_text += f"""
-==================================================
-CHUNK ID:
-{section["chunk_id"]}
+--------------------------------------------------
+CHUNK ID: {section["chunk_id"]}
+TITLE: {section.get("title", "")}
+TIMESTAMP: {section.get("start_time", 0):.2f}s - {section.get("end_time", 0):.2f}s
 
-SECTION TITLE:
-{section["title"]}
-
-SECTION TIMESTAMP:
-{section["start_time"]:.2f}s - {section["end_time"]:.2f}s
-==================================================
-
-{section["transcript"]}
-
+TRANSCRIPT:
+{section.get("transcript", "")}
+--------------------------------------------------
 """
 
-    return f"""
-You are an expert teacher and technical educator.
+    # --------------------------------------------------
+    # Main prompt
+    # --------------------------------------------------
 
-Your task is to turn ONE transcript section into a deep,
-clear, and genuinely useful learning explanation.
+    prompt = f"""
+You are a knowledgeable educator and technical writer.
 
-You are NOT writing a transcript summary.
+Your job is to transform the transcript into a clear,
+deep, human-readable learning explanation.
 
-You are TEACHING the knowledge contained in the transcript.
+Think of yourself as a good teacher explaining the topic
+to a student, not as an automatic transcript summarizer.
 
-Imagine that a student is reading your explanation instead of
-watching this part of the video.
-
-Your explanation should feel like a good teacher sitting beside
-the student and saying:
-
-"Let me first explain what this means.
-Now let me show you why it matters.
-Now let's understand how it works.
-Now let's connect it to the example.
-And finally, let's make sure the main idea is clear."
+The final explanation should feel like a useful textbook page
+or study note written by a human teacher.
 
 ==================================================
 SOURCE INFORMATION
 ==================================================
 
-VIDEO DOMAIN:
+DOMAIN:
 {domain}
 
 CONTENT TYPE:
@@ -133,228 +103,152 @@ DIFFICULTY:
 CONTENT CATEGORY:
 {category}
 
+
 ==================================================
 TRANSCRIPT
 ==================================================
 
+The following chunks are parts of ONE continuous lesson:
+
 {sections_text}
 
-==================================================
-YOUR PRIMARY GOAL
-==================================================
-
-ULTIMATE FINAL OUTPUT GOAL: Write a clear, structured, teaching-quality explanation of what is actually covered —
-think of it like the best textbook page, encyclopedia entry, or documentation for THIS specific
-subject. Stay tightly grounded in the transcript; do not drift into unrelated territory.
-
-For this chunk, produce a DEEP LEARNING EXPLANATION.
-
-The goal is not to preserve the speaker's wording.
-
-The goal is to preserve the KNOWLEDGE and make that knowledge
-easy for a learner to understand.
-
-A strong explanation should answer, whenever the transcript
-provides enough information:
-
-- What is this concept?
-- What does it mean in simple language?
-- Why is it important?
-- How does it work?
-- Why does it work?
-- What problem does it solve?
-- How are the different ideas connected?
-- What example is being used?
-- What does the example demonstrate?
-- What would happen in the process?
-- What important distinction should the learner understand?
-- What is the main takeaway?
-
-Do NOT force questions that are not relevant to the chunk.
-
-CONTINUITY AND REPETITION RULES:
-
-Treat the chunks as parts of ONE continuous lesson, not as
-independent articles.
-
-Each chunk should advance the learner's understanding.
-
-Do NOT repeatedly reintroduce concepts that were already clearly
-explained in earlier chunks.
-
-For example, if an earlier chunk has already explained:
-
-- what a decision tree is
-- what decision nodes and leaf nodes are
-- what x0 and x1 represent
-
-then later chunks should normally refer to those ideas naturally
-instead of defining them again.
-
-Use short references such as:
-"At this point, the tree..."
-"Now the splitting process..."
-"Once a split is chosen..."
-rather than restarting the explanation.
-
-Repeat a concept only when:
-
-1. the current chunk introduces a new aspect of it,
-2. a brief reminder is necessary for clarity, or
-3. the transcript itself revisits the concept in a materially
-   different way.
-
-Prioritize NEW UNDERSTANDING over repeated BACKGROUND.
-
-Every chunk should answer:
-"What does this chunk teach that the learner did not already know?"
-
-Avoid repetitive opening patterns such as:
-"A decision tree is..."
-"A decision tree is..."
-"A decision tree is..."
-
-Also avoid forcing every chunk to contain:
-definition → why → how → example → takeaway.
-
-The structure should follow the actual teaching progression of
-the material.
 
 ==================================================
-TEACHING PHILOSOPHY
+YOUR MAIN JOB
 ==================================================
 
-Teach progressively.
+For each chunk, explain what that chunk actually teaches.
 
-Do not immediately dump technical terminology on the learner.
+The goal is understanding, not sentence-by-sentence summarization.
 
-When appropriate, follow this natural progression:
+For each chunk, when supported by the transcript, explain:
 
-1. START WITH THE IDEA
+- WHAT is being taught?
+- WHY does it matter?
+- HOW does it work?
+- What reasoning or mechanism is involved?
+- What example helps explain it?
+- How does it connect to ideas already introduced?
+- What is the important takeaway?
 
-Introduce the main concept in simple language.
+Do not force every chunk to contain all of these.
 
-The learner should understand the basic idea before seeing
-technical details.
-
-2. BUILD INTUITION
-
-Explain what the concept means intuitively.
-
-If the transcript provides an analogy, comparison, visualization,
-or real-world explanation, use it.
-
-3. EXPLAIN THE REASONING
-
-Explain WHY the concept works or WHY it is useful when the
-transcript provides that reasoning.
-
-Do not merely state facts.
-
-Explain the relationship between cause and effect.
-
-4. EXPLAIN THE MECHANISM
-
-If the transcript explains how something works, walk through
-that mechanism clearly.
-
-Break complicated processes into understandable steps.
-
-5. USE THE EXAMPLE
-
-If the transcript contains an example, do not merely mention it.
-
-Explain:
-
-- what the example is showing
-- why the example was introduced
-- how it demonstrates the concept
-- what the learner should notice
-
-6. CONNECT IDEAS
-
-If the transcript connects this concept with another concept,
-make that relationship explicit.
-
-For example:
-
-"Because X happens, Y becomes possible."
-
-or:
-
-"X is useful because it solves the limitation of Y."
-
-7. END WITH THE IMPORTANT IDEA
-
-Finish with the central insight when the chunk contains a
-clear conclusion.
-
+Let the actual content determine the explanation.
 
 
 ==================================================
-DEPTH RULE
+TEACHING STYLE
 ==================================================
 
-Do not optimize for brevity.
+Write like a good teacher.
 
-Optimize for UNDERSTANDING.
+The explanation should be:
 
-A short transcript may naturally produce a short explanation.
+- clear
+- natural
+- friendly
+- technically accurate
+- easy to follow
+- useful for studying
 
-A dense transcript should produce a sufficiently detailed
-explanation covering the important ideas.
+Prefer simple language before introducing complicated terminology.
 
-Do not artificially shorten an explanation merely because the
-transcript is concise.
+When a technical term is necessary, explain it naturally.
 
-At the same time, do not repeat the same idea using different
-words.
+Use transitions such as:
 
-Every paragraph should either:
-
-- introduce an important idea
-- explain an idea
-- explain why it matters
-- explain how it works
-- clarify a relationship
-- explain an example
-- resolve an important distinction
-- provide a supported takeaway
-
-==================================================
-FRIENDLY TEACHING STYLE
-==================================================
-
-Use simple, natural language.
-
-Prefer:
-
-"Think of this as..."
-
-"The important idea here is..."
+"The key idea is..."
 
 "This matters because..."
 
-"In simple terms..."
+"Now the interesting part is..."
+
+"Once we understand this..."
 
 "The reason for this is..."
 
-"For example..."
+"Now we can see why..."
 
-"This means that..."
+Use them naturally, not mechanically.
 
-when they naturally improve understanding.
+Do not use fake enthusiasm such as:
 
-Do not use these phrases mechanically.
+"Awesome!"
 
-The writing should feel natural, not like a fixed template.
+"Super easy!"
 
-Technical terminology should still be preserved when important.
+"Great!"
 
-When introducing an important technical term, explain it in
-simple language before relying on it.
+Do not sacrifice technical accuracy just to sound friendly.
 
-The result should be approachable WITHOUT becoming shallow.
+
+==================================================
+TEACHING PROGRESSION
+==================================================
+
+Treat the chunks as one lesson.
+
+Earlier chunks provide context for later chunks.
+
+If an earlier chunk already explained a concept, later chunks should
+normally build on it instead of defining it again from scratch.
+
+For example:
+
+Instead of repeatedly saying:
+
+"A decision tree is..."
+
+prefer:
+
+"With the tree structure established..."
+
+or:
+
+"Now the algorithm needs to decide which split to choose."
+
+However, repeat an earlier concept briefly when:
+
+- the current chunk adds a new aspect to it,
+- a reminder is necessary for clarity, or
+- the transcript meaningfully revisits it.
+
+Every chunk should add new understanding.
+
+Do not make the explanation feel like several independent articles.
+
+
+==================================================
+SOURCE OF TRUTH
+==================================================
+
+The transcript is the primary source of truth.
+
+Stay grounded in the supplied material.
+
+You may reorganize, simplify, clarify, and explain the material,
+but do not invent unsupported information.
+
+Do not invent:
+
+- facts
+- statistics
+- examples
+- formulas
+- datasets
+- quotations
+- historical details
+- technical behavior
+- implementation details
+- code
+- commands
+- APIs
+
+If the transcript does not provide enough information,
+prefer a shorter accurate explanation over a speculative one.
+
+Do not silently correct the source using outside knowledge.
+
 
 ==================================================
 EXAMPLE POLICY
@@ -362,243 +256,272 @@ EXAMPLE POLICY
 
 {example_policy}
 
-Follow this policy strictly.
-
-If the transcript already contains an example, explain that
-example deeply.
-
-Do not invent examples unless the example policy explicitly
-allows them.
 
 ==================================================
-GROUNDING
+MATHEMATICAL EXPLANATIONS
 ==================================================
 
-The transcript is the source of truth.
+When explaining mathematics, formulas, equations, or calculations,
+prioritize human readability.
 
-You may:
+Do NOT dump complicated mathematical notation without explanation.
 
-- reorganize ideas
-- simplify wording
-- clarify relationships
-- explain reasoning already present
-- combine closely related statements
-- turn an implicit explanation into clearer teaching language
+Explain what the formula means in simple words.
 
-You may NOT introduce unsupported factual information.
+Prefer readable plain-text mathematical notation.
 
-Do not use outside knowledge to expand the topic.
+For example, prefer:
 
-If something is not sufficiently supported by the transcript,
-do not guess.
+Entropy = -p₁ log₂(p₁) - p₂ log₂(p₂)
 
-Accuracy is more important than completeness.
+over unnecessarily complicated LaTeX.
 
-==================================================
-WHAT NOT TO DO
-==================================================
+Do NOT use raw LaTeX commands such as:
 
-Do NOT:
+\\frac
+\\sum
+\\sqrt
+\\begin{{...}}
+\\end{{...}}
 
-- mechanically paraphrase the transcript
-- reproduce the transcript
-- turn every sentence into a separate bullet
-- create shallow one-paragraph summaries
-- list concepts without explaining them
-- mention "the video"
-- mention "the speaker"
-- mention "the creator"
-- say "in this section"
-- add unrelated background information
-- invent facts
-- invent examples
-- invent formulas
-- invent code
-- fabricate quotations
-- fabricate citations
+unless the notation genuinely improves understanding.
 
-Do not force every possible block type into the explanation.
+If variables are used, explain what each variable means.
 
-==================================================
-STRUCTURE
-==================================================
+For a worked calculation, preferably use this flow:
 
-Use a natural teaching structure.
+1. Given values
+2. Formula
+3. Substitute the values
+4. Calculate
+5. Explain what the result means
 
-A typical conceptual explanation may look like:
+For example:
 
-Heading:
-What is the concept?
+Entropy measures uncertainty in the data.
 
-Paragraph:
-Simple explanation.
+Formula:
+Entropy = -p₁ log₂(p₁) - p₂ log₂(p₂)
 
-Paragraph:
-Intuition / meaning.
+Here, p₁ and p₂ represent the proportions of the two classes.
 
-Heading:
-Why does it matter?
+If both classes are equally common, uncertainty is higher.
+If one class dominates, uncertainty is lower.
 
-Paragraph:
-Reason or purpose supported by the transcript.
+The formula should support the explanation,
+not replace the explanation.
 
-Heading:
-How does it work?
-
-Paragraph:
-Mechanism or process.
-
-Heading:
-Example
-
-Paragraph:
-Explain the example and what it demonstrates.
-
-Callout:
-Important insight / common distinction / key takeaway.
-
-However, DO NOT force this exact structure.
-
-Choose the structure that best teaches the actual chunk.
-
-For a process:
-
-Goal
-→ Step 1
-→ Step 2
-→ Step 3
-→ Result
-
-For a mathematical concept:
-
-Concept
-→ Meaning of variables
-→ Reasoning
-→ Worked example
-→ Interpretation
-
-For programming:
-
-Concept
-→ Why it is needed
-→ How it works
-→ Code
-→ Expected behavior
-
-For a comparison:
-
-Concept A
-→ Concept B
-→ Difference
-→ When each matters
 
 ==================================================
-BLOCK TYPES
+HUMAN READABILITY
 ==================================================
+
+The output will be read by a student on a screen.
+
+Make it feel like human-written study material.
+
+Prefer:
+
+- short to medium paragraphs
+- meaningful headings
+- natural transitions
+- step-by-step explanations when useful
+- readable formulas
+- concrete reasoning
+- useful examples
+- clear takeaways
+
+Avoid:
+
+- giant paragraphs
+- robotic language
+- unnecessary formal language
+- raw LaTeX
+- unexplained formulas
+- excessive symbols
+- excessive jargon
+- repetitive definitions
+- filler
+- sentence-by-sentence transcript paraphrasing
+
+The learner should be able to read the explanation naturally
+without feeling that they are reading raw LLM output.
+
+
+==================================================
+DO NOT FORCE A TEMPLATE
+==================================================
+
+Do NOT force every chunk into:
+
+definition → why → how → example → takeaway
+
+Some chunks may mainly explain:
+
+- a definition
+- a mechanism
+- a formula
+- an algorithm
+- an example
+- a comparison
+- a process
+- a result
+
+Follow the actual teaching progression.
+
+
+==================================================
+CONTENT STRUCTURE
+==================================================
+
+Represent each chunk using meaningful blocks.
 
 Allowed block types:
 
-{block_types}
+- heading
+- paragraph
+- table
+- callout
 
-HEADING:
-Use for meaningful conceptual changes.
+For programming content, code blocks may also be used when genuinely
+supported by the transcript.
 
-PARAGRAPH:
-Use for detailed explanations, reasoning, mechanisms,
-definitions, examples, and connections.
+Use a block only when it improves understanding.
 
-TABLE:
-Use only when a comparison, classification, sequence,
-or structured relationship genuinely becomes easier to understand
-as a table.
+Do not create tables just for visual variety.
 
-CALLOUT:
-Use for an especially important insight, warning, distinction,
-reason, or takeaway supported by the transcript.
+Do not create callouts just for visual variety.
 
-CODE:
-Use only when genuinely supported programming content exists.
-
-Do not use blocks merely to make the output look structured.
 
 ==================================================
-IMPORTANT QUALITY RULE
+CODE
 ==================================================
 
-The explanation should NOT feel like:
+If the content category is code:
 
-"Here are the things mentioned in the transcript."
+Code may be included only when supported by the transcript.
 
-It should feel like:
+When code is included:
 
-"Now I understand what this concept means,
-why it matters, and how it works."
+- keep it correct
+- explain what it does
+- explain important logic
+- explain expected behavior when supported
 
-Prioritize learner understanding over information density.
+Never invent or complete missing code.
+
 
 ==================================================
 KEY CONCEPTS
 ==================================================
 
-Return 2-8 important concepts.
+Return 2–8 important concepts for each chunk.
 
-These are NOT a summary of every topic mentioned.
+Choose concepts that the learner should actually remember.
 
-They should represent the concepts a learner should remember
-after understanding this chunk.
+Do not simply list every technical word mentioned in the transcript.
+
 
 ==================================================
 SKETCH NOTE
 ==================================================
 
-Create a compact visual representation of the explanation.
+Create a compact visual-learning summary for each chunk.
 
-title:
-Maximum 5 words.
+It must contain:
 
-subtitle:
-Exactly one sentence explaining the central idea.
+- title
+- subtitle
+- boxes
+- takeaway
 
-boxes:
-3-6 important ideas in logical order.
+The sketch note must summarize the explanation.
 
-takeaway:
-Exactly one sentence containing the most important insight.
+Do not introduce new information in the sketch note.
 
-The sketch note must contain only information supported by
-the transcript.
 
 ==================================================
 DIFFICULTY
 ==================================================
 
-Return an integer from 1 to 5.
+Return a difficulty rating from 1 to 5:
 
-1 = very simple
+1 = very basic
 2 = basic
-3 = moderate
+3 = intermediate
 4 = advanced
-5 = highly advanced
+5 = very advanced
 
-Base this on the actual conceptual difficulty of the chunk.
+Rate the actual conceptual difficulty of the chunk.
+
 
 ==================================================
-FINAL SELF-CHECK
+IMPORTANT OUTPUT RULE
 ==================================================
 
-Before returning the answer, verify:
+The explanation itself is the most important part.
 
-1. The explanation actually teaches the concept.
-2. The explanation is deeper than a simple summary.
-3. Important WHY and HOW reasoning has been explained when supported.
-4. Examples have been explained rather than merely mentioned.
-5. Related ideas have been connected.
-6. No unsupported facts have been introduced.
-7. No unnecessary repetition exists.
-8. The result is grounded in the transcript.
-9. key_concepts contains 2-8 items.
-10. sketch_note is concise and grounded.
-11. difficulty_rating is between 1 and 5.
+Supporting fields such as:
+
+- key_concepts
+- sketch_note
+- difficulty_rating
+
+must support the explanation rather than control it.
+
+Do not make the explanation unnatural just to satisfy these fields.
+
+
+==================================================
+CHUNK RULE
+==================================================
+
+For every input chunk:
+
+- return exactly one result
+- preserve the exact chunk_id
+- do not merge chunks
+- do not omit chunks
+- do not invent chunk IDs
+- do not reorder chunks
+
+Focus mainly on the current chunk.
+
+Earlier chunks may be used for continuity.
+
+Do not pre-teach material that belongs to later chunks.
+
+
+==================================================
+DO NOT
+==================================================
+
+Do NOT:
+
+- mention "the video"
+- mention "the creator"
+- mention "the speaker"
+- say "in this section"
+- say "the video explains"
+- say "the speaker says"
+- write a sentence-by-sentence transcript paraphrase
+- restart the lesson in every chunk
+- repeatedly redefine the same concept
+- invent unsupported information
+- add unrelated background knowledge
+- force examples
+- force tables
+- force callouts
+- force formulas
+- force diagrams
+- use complicated LaTeX unnecessarily
+- produce unexplained mathematical notation
+- sacrifice correctness for simplicity
+
+
+==================================================
+OUTPUT FORMAT
+==================================================
 
 Return ONLY valid JSON.
 
@@ -611,11 +534,16 @@ Use exactly this structure:
             "blocks": [
                 {{
                     "type": "heading",
-                    "content": "Main Concept"
+                    "content": "Major Concept"
                 }},
                 {{
                     "type": "paragraph",
-                    "content": "Detailed explanation..."
+                    "content": "Clear explanation of the concept."
+                }},
+                {{
+                    "type": "callout",
+                    "variant": "why",
+                    "content": "Why this matters."
                 }}
             ],
             "key_concepts": [
@@ -627,16 +555,43 @@ Use exactly this structure:
                 "title": "Core Idea",
                 "subtitle": "One sentence explaining the central idea.",
                 "boxes": [
-                    "Important idea",
+                    "Important point",
                     "Important relationship",
                     "Important mechanism"
                 ],
-                "takeaway": "One memorable insight."
+                "takeaway": "One memorable insight supported by the transcript."
             }},
             "difficulty_rating": 3
         }}
     ]
 }}
 
+
+==================================================
+FINAL CHECK
+==================================================
+
+Before returning the JSON, check:
+
+1. Every input chunk has exactly one result.
+2. Every chunk_id is preserved.
+3. The explanation is grounded in the transcript.
+4. The explanation feels like a teacher explaining the topic.
+5. The explanation focuses on understanding, not paraphrasing.
+6. Repetition across chunks is minimized.
+7. WHY and HOW are explained when supported.
+8. Examples are used only when useful and supported.
+9. Mathematical explanations are human-readable.
+10. Complicated LaTeX is avoided unless necessary.
+11. Formulas are explained instead of dumped.
+12. Important technical details are preserved.
+13. No unsupported information is invented.
+14. key_concepts contains 2–8 items.
+15. sketch_note contains title, subtitle, boxes, and takeaway.
+16. difficulty_rating is an integer from 1 to 5.
+17. The JSON is syntactically valid.
+
 Return ONLY the JSON object.
 """
+
+    return prompt

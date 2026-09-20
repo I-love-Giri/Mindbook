@@ -3,7 +3,8 @@ from typing import Any, Dict, List
 
 from features.deep_dive.l5_prompt import build_section_prompt
 from features.deep_dive.l5_validator import normalize_deep_dive_result
-from l2_layer import layer2_content_parse
+
+# from l2_layer import layer2_content_parse
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
@@ -88,7 +89,7 @@ async def layer5_deep_dive(
 
         raw = await llm_service.generate(
             prompt=prompt,
-            max_tokens=6000,
+            max_tokens=3000,
             temperature=0.2,
             json_output=True,
         )
