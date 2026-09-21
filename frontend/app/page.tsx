@@ -149,579 +149,303 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-white text-gray-900">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6">
-        {/* Navbar */}
-        <nav className="flex items-center justify-between py-6">
-          <h1 className="text-2xl font-bold">MindBook</h1>
-
-          <button className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-50">
-            My Library
-          </button>
-        </nav>
-
-        {/* Hero Section */}
-        <section className="flex flex-1 flex-col items-center justify-center text-center">
-          <div className="mb-4 rounded-full bg-gray-100 px-4 py-2 text-sm">
-            AI-powered learning assistant
-          </div>
-
-          <h2 className="max-w-3xl text-5xl font-bold tracking-tight">
-            Turn YouTube videos into
-            <span className="block">powerful study notes.</span>
-          </h2>
-
-          <p className="mt-6 max-w-2xl text-lg text-gray-500">
-            Paste a YouTube video and MindBook will transform it into summaries,
-            deep explanations, knowledge graphs, flashcards and more.
-          </p>
-
-          {/* URL Input */}
-          <div className="mt-10 flex w-full max-w-2xl gap-3">
-            <input
-              type="text"
-              placeholder="Paste YouTube URL..."
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              className="flex-1 rounded-xl border border-gray-300 px-5 py-4 outline-none focus:border-black"
-            />
-
-            <button
-              onClick={handleGenerate}
-              className="rounded-xl bg-black px-6 py-4 font-medium text-white hover:bg-gray-800"
-            >
-              Generate
-            </button>
-          </div>
-
-          {/* Backend Response */}
-          {message && <p className="mt-4 text-gray-600">{message}</p>}
-
-          {result && (
-            <div className="mt-12 w-full max-w-5xl text-left space-y-6">
-              {/* MindBook Header */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <p className="text-sm font-medium text-gray-500">MindBook</p>
-
-                <h2 className="mt-2 text-3xl font-bold text-gray-900">
-                  {result.content.overall_topic}
-                </h2>
-
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
-                    {result.content.content_type}
-                  </span>
-
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
-                    {result.content.difficulty}
-                  </span>
-
-                  <span className="rounded-full bg-gray-100 px-3 py-1 text-sm text-gray-700">
-                    {result.content.domain}
-                  </span>
-                </div>
+    <main className="min-h-screen bg-[#F7F7F5] text-zinc-900">
+      <div className="flex min-h-screen">
+        {/* ================= SIDEBAR ================= */}
+        <aside className="hidden w-64 shrink-0 border-r border-zinc-200 bg-white lg:flex lg:flex-col">
+          {/* Logo */}
+          <div className="flex h-20 items-center px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-600 text-white shadow-sm">
+                ✦
               </div>
 
-              {/* Executive Summary */}
-              <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">⚡ Executive Summary</h3>
+              <div>
+                <h1 className="text-lg font-semibold tracking-tight">
+                  MindBook
+                </h1>
 
-                <p className="mt-3 leading-7 text-gray-600">
-                  {result.synthesis.executive_summary}
+                <p className="text-[11px] text-zinc-400">Learn deeper.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <div className="flex-1 px-4 py-4">
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              Library
+            </p>
+
+            <nav className="mt-3 space-y-1">
+              <button className="flex w-full items-center gap-3 rounded-xl bg-violet-50 px-3 py-2.5 text-sm font-medium text-violet-700">
+                <span>✦</span>
+                Overview
+              </button>
+
+              <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition hover:bg-zinc-50">
+                <span>◈</span>
+                Knowledge
+              </button>
+
+              <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition hover:bg-zinc-50">
+                <span>▤</span>
+                Guide
+              </button>
+
+              <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition hover:bg-zinc-50">
+                <span>✧</span>
+                Study
+              </button>
+
+              <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-zinc-600 transition hover:bg-zinc-50">
+                <span>◇</span>
+                Notes
+              </button>
+            </nav>
+
+            <div className="my-8 border-t border-zinc-100" />
+
+            <p className="px-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-400">
+              Features
+            </p>
+
+            <div className="mt-3 space-y-1">
+              <div className="rounded-xl px-3 py-2.5 text-sm text-zinc-500">
+                Smart Summary
+              </div>
+
+              <div className="rounded-xl px-3 py-2.5 text-sm text-zinc-500">
+                Deep Dive
+              </div>
+
+              <div className="rounded-xl px-3 py-2.5 text-sm text-zinc-500">
+                Study Assets
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom */}
+          <div className="border-t border-zinc-100 p-4">
+            <div className="rounded-xl bg-zinc-50 p-3">
+              <p className="text-xs font-medium text-zinc-700">MindBook AI</p>
+
+              <p className="mt-1 text-[11px] leading-5 text-zinc-400">
+                Turn videos into knowledge you can actually remember.
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* ================= MAIN AREA ================= */}
+        <div className="min-w-0 flex-1">
+          {/* ================= HEADER ================= */}
+          <header className="sticky top-0 z-20 border-b border-zinc-200/80 bg-[#F7F7F5]/90 backdrop-blur">
+            <div className="flex h-20 items-center justify-between px-6 lg:px-10">
+              <div className="lg:hidden">
+                <h1 className="text-lg font-semibold">MindBook</h1>
+              </div>
+
+              <div className="hidden lg:block">
+                <p className="text-sm text-zinc-500">
+                  Your personal learning workspace
                 </p>
               </div>
 
-              {/* Learning Objectives */}
-              <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">
-                  🎯 Learning Objectives
-                </h3>
+              <div className="flex items-center gap-3">
+                <button className="hidden rounded-xl border border-zinc-200 bg-white px-4 py-2 text-sm text-zinc-600 shadow-sm transition hover:border-zinc-300 hover:text-zinc-900 sm:block">
+                  My Library
+                </button>
 
-                <ul className="mt-4 space-y-3">
-                  {result.content.learning_objectives.map(
-                    (objective: string, index: number) => (
-                      <li key={index} className="flex gap-3">
-                        <span>✓</span>
-                        <span className="text-gray-600">{objective}</span>
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
-
-              {/* Topics */}
-              <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">📚 Topics Covered</h3>
-
-                <div className="mt-4 space-y-4">
-                  {result.content.topics.map((topic: any, index: number) => (
-                    <div key={index} className="rounded-xl bg-gray-50 p-4">
-                      <h4 className="font-medium">{topic.title}</h4>
-
-                      <p className="mt-1 text-sm leading-6 text-gray-600">
-                        {topic.summary}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Complete Guide */}
-              <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">📖 Complete Guide</h3>
-
-                <div className="mt-4 whitespace-pre-line leading-7 text-gray-600">
-                  {result.synthesis.complete_guide}
-                </div>
-              </div>
-
-              {/* FAQ */}
-              <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">
-                  ❓ Frequently Asked Questions
-                </h3>
-
-                <div className="mt-4 space-y-5">
-                  {result.synthesis.faq.map((item: any, index: number) => (
-                    <div key={index}>
-                      <h4 className="font-medium">{item.q}</h4>
-
-                      <p className="mt-1 text-sm leading-6 text-gray-600">
-                        {item.a}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Knowledge Graph */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">🕸️ Knowledge Graph</h3>
-
-                {/* Nodes */}
-                <div className="mt-6">
-                  <h4 className="font-medium text-gray-900">Concepts</h4>
-
-                  <div className="mt-3 flex flex-wrap gap-3">
-                    {result.knowledge_graph.nodes.map(
-                      (node: any, index: number) => (
-                        <span
-                          key={index}
-                          className="rounded-xl border bg-gray-50 px-4 py-2 text-sm text-gray-700"
-                        >
-                          {node.label || node.name || node.id}
-                        </span>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Relationships */}
-                <div className="mt-8">
-                  <h4 className="font-medium text-gray-900">Relationships</h4>
-
-                  <div className="mt-3 space-y-3">
-                    {result.knowledge_graph.edges.map(
-                      (edge: any, index: number) => {
-                        const fromNode = result.knowledge_graph.nodes.find(
-                          (node: any) => node.id === edge.from
-                        );
-
-                        const toNode = result.knowledge_graph.nodes.find(
-                          (node: any) => node.id === edge.to
-                        );
-
-                        return (
-                          <div
-                            key={index}
-                            className="rounded-xl bg-gray-50 px-4 py-3 text-sm"
-                          >
-                            <span className="font-medium text-gray-900">
-                              {fromNode?.label || edge.from}
-                            </span>
-
-                            <span className="mx-2 text-gray-400">→</span>
-
-                            <span className="text-gray-500">
-                              {edge.relation}
-                            </span>
-
-                            <span className="mx-2 text-gray-400">→</span>
-
-                            <span className="font-medium text-gray-900">
-                              {toNode?.label || edge.to}
-                            </span>
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Deep Dive */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">🔍 Deep Dive</h3>
-
-                <div className="mt-6 space-y-6">
-                  {result.deep_dive.map((chunk: any, index: number) => (
-                    <div
-                      key={chunk.chunk_id ?? index}
-                      className="rounded-xl bg-gray-50 p-5"
-                    >
-                      {/* Chunk Header */}
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-semibold">
-                          Chunk {chunk.chunk_id}
-                        </h4>
-
-                        <span className="rounded-full bg-white px-3 py-1 text-sm">
-                          Difficulty: {chunk.result.difficulty_rating}/5
-                        </span>
-                      </div>
-
-                      {/* Explanation Blocks */}
-                      <div className="mt-5 space-y-5">
-                        {chunk.result.blocks.map(
-                          (block: any, blockIndex: number) => (
-                            <div key={blockIndex}>
-                              {block.type === "heading" && (
-                                <h5 className="font-medium text-gray-900">
-                                  {block.content}
-                                </h5>
-                              )}
-
-                              {block.type === "paragraph" && (
-                                <p className="mt-2 leading-7 text-gray-600">
-                                  {block.content}
-                                </p>
-                              )}
-                            </div>
-                          )
-                        )}
-                      </div>
-
-                      {/* Key Concepts */}
-                      {chunk.result.key_concepts?.length > 0 && (
-                        <div className="mt-6">
-                          <h5 className="font-medium">💡 Key Concepts</h5>
-
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {chunk.result.key_concepts.map(
-                              (concept: string, conceptIndex: number) => (
-                                <span
-                                  key={conceptIndex}
-                                  className="rounded-full bg-white px-3 py-1 text-sm text-gray-700"
-                                >
-                                  {concept}
-                                </span>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Sketch Note */}
-                      {chunk.result.sketch_note && (
-                        <div className="mt-6 rounded-xl bg-white p-4">
-                          <h5 className="font-medium">
-                            📝 {chunk.result.sketch_note.title}
-                          </h5>
-
-                          <p className="mt-2 text-sm text-gray-500">
-                            {chunk.result.sketch_note.subtitle}
-                          </p>
-
-                          <ul className="mt-3 space-y-2">
-                            {chunk.result.sketch_note.boxes?.map(
-                              (box: string, boxIndex: number) => (
-                                <li
-                                  key={boxIndex}
-                                  className="text-sm text-gray-600"
-                                >
-                                  • {box}
-                                </li>
-                              )
-                            )}
-                          </ul>
-
-                          <p className="mt-4 text-sm leading-6 text-gray-600">
-                            <strong>Takeaway:</strong>{" "}
-                            {chunk.result.sketch_note.takeaway}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Study Assets */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">🎯 Study Assets</h3>
-
-                {/* Quiz */}
-                <div className="mt-6">
-                  <h4 className="font-medium text-gray-900">📝 Quiz</h4>
-
-                  <div className="mt-4 space-y-5">
-                    {result.study_assets.quiz.map(
-                      (question: any, index: number) => {
-                        const selected = selectedAnswers[index];
-                        const checked = checkedAnswers[index];
-
-                        const isCorrect = selected === question.correct;
-
-                        return (
-                          <div
-                            key={index}
-                            className="rounded-xl bg-gray-50 p-5"
-                          >
-                            {/* Question */}
-                            <div className="flex items-start justify-between gap-4">
-                              <h5 className="font-medium">
-                                {index + 1}. {question.question}
-                              </h5>
-
-                              <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs">
-                                {question.difficulty}
-                              </span>
-                            </div>
-
-                            {/* Options */}
-                            <div className="mt-4 space-y-2">
-                              {question.options.map(
-                                (option: string, optionIndex: number) => {
-                                  const optionLetter = option.split(")")[0];
-
-                                  const isSelected = selected === optionLetter;
-
-                                  return (
-                                    <button
-                                      key={optionIndex}
-                                      onClick={() =>
-                                        setSelectedAnswers((prev) => ({
-                                          ...prev,
-                                          [index]: optionLetter,
-                                        }))
-                                      }
-                                      className={`w-full rounded-lg border px-4 py-3 text-left text-sm transition ${
-                                        isSelected
-                                          ? "border-black bg-white"
-                                          : "border-gray-200 bg-white hover:border-gray-400"
-                                      }`}
-                                    >
-                                      {option}
-                                    </button>
-                                  );
-                                }
-                              )}
-                            </div>
-
-                            {/* Check Answer */}
-                            <button
-                              disabled={!selected}
-                              onClick={() =>
-                                setCheckedAnswers((prev) => ({
-                                  ...prev,
-                                  [index]: true,
-                                }))
-                              }
-                              className="mt-4 rounded-lg bg-black px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-gray-300"
-                            >
-                              Check Answer
-                            </button>
-
-                            {/* Result */}
-                            {checked && (
-                              <div className="mt-4 rounded-lg bg-white p-4">
-                                <p
-                                  className={`font-medium ${
-                                    isCorrect
-                                      ? "text-green-600"
-                                      : "text-red-600"
-                                  }`}
-                                >
-                                  {isCorrect ? "✅ Correct!" : "❌ Wrong!"}
-                                </p>
-
-                                {!isCorrect && (
-                                  <p className="mt-2 text-sm text-gray-600">
-                                    Correct answer:{" "}
-                                    <strong>{question.correct}</strong>
-                                  </p>
-                                )}
-
-                                <p className="mt-2 text-sm leading-6 text-gray-600">
-                                  {question.explanation}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }
-                    )}
-                  </div>
-
-                  {/* Reset */}
-                  <button
-                    onClick={() => {
-                      setSelectedAnswers({});
-                      setCheckedAnswers({});
-                    }}
-                    className="mt-6 rounded-lg border px-4 py-2 text-sm hover:bg-gray-50"
-                  >
-                    Reset Quiz
-                  </button>
-                </div>
-
-                {/* Concept Timeline */}
-                <div className="mt-10">
-                  <h4 className="font-medium text-gray-900">
-                    ⏱️ Concept Timeline
-                  </h4>
-
-                  <div className="mt-4 space-y-3">
-                    {result.study_assets.concept_timeline.map(
-                      (item: any, index: number) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-4 rounded-xl bg-gray-50 p-4"
-                        >
-                          <span className="rounded-lg bg-white px-3 py-2 text-sm font-medium">
-                            {item.timestamp}s
-                          </span>
-
-                          <div className="flex-1">
-                            <p className="font-medium">{item.concept}</p>
-
-                            <p className="text-sm text-gray-500">
-                              Importance: {item.importance}
-                            </p>
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Mind Map */}
-                <div className="mt-10">
-                  <h4 className="font-medium text-gray-900">🗺️ Mind Map</h4>
-
-                  <div className="mt-4 rounded-xl bg-gray-50 p-6">
-                    <div className="space-y-3">
-                      {result.study_assets.mind_map_text
-                        .split("\n")
-                        .map((line: string, index: number) => {
-                          const trimmed = line.trim();
-
-                          if (!trimmed) return null;
-
-                          const spaces = line.length - line.trimStart().length;
-                          const level = Math.floor(spaces / 2);
-
-                          return (
-                            <div
-                              key={index}
-                              style={{
-                                marginLeft: `${level * 32}px`,
-                              }}
-                              className={`rounded-lg border bg-white px-4 py-3 ${
-                                level === 0
-                                  ? "text-lg font-bold"
-                                  : level === 1
-                                  ? "font-semibold"
-                                  : "text-sm text-gray-600"
-                              }`}
-                            >
-                              {level > 0 && (
-                                <span className="mr-2 text-gray-400">
-                                  {level === 1 ? "└─" : "•"}
-                                </span>
-                              )}
-
-                              {trimmed}
-                            </div>
-                          );
-                        })}
-                    </div>
-                  </div>
+                <div className="flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-sm font-medium shadow-sm">
+                  M
                 </div>
               </div>
             </div>
-          )}
-        </section>
+          </header>
 
-        {/* Features */}
-        <section className="grid grid-cols-1 gap-4 pb-10 md:grid-cols-3">
-          <div className="rounded-2xl border p-6">
-            <h3 className="font-semibold">Smart Summary</h3>
+          {/* ================= PAGE CONTENT ================= */}
+          <section className="mx-auto max-w-6xl px-6 py-12 lg:px-10 lg:py-16">
+            {/* HERO */}
+            <div className="max-w-4xl">
+              <div className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700">
+                <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                AI-powered learning workspace
+              </div>
 
-            <p className="mt-2 text-sm text-gray-500">
-              Understand the main ideas without watching the entire video.
-            </p>
-          </div>
+              <h2 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-950 sm:text-5xl lg:text-6xl">
+                Turn videos into
+                <span className="block text-violet-600">
+                  knowledge you remember.
+                </span>
+              </h2>
 
-          <div className="rounded-2xl border p-6">
-            <h3 className="font-semibold">Deep Dive</h3>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Explore concepts and explanations extracted from the content.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border p-6">
-            <h3 className="font-semibold">Study Assets</h3>
-
-            <p className="mt-2 text-sm text-gray-500">
-              Generate flashcards, quizzes and revision material.
-            </p>
-          </div>
-        </section>
-
-        {/* Ask AI / RAG */}
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold">💬 Ask about this video</h3>
-
-          <p className="mt-2 text-sm text-gray-500">
-            Ask questions about the concepts explained in this video.
-          </p>
-
-          <div className="mt-5 flex gap-3">
-            <input
-              type="text"
-              placeholder="e.g. What is majority voting?"
-              value={question}
-              onChange={(event) => setQuestion(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  handleAsk();
-                }
-              }}
-              className="flex-1 rounded-xl border border-gray-300 px-5 py-3 outline-none focus:border-black"
-            />
-
-            <button
-              onClick={handleAsk}
-              disabled={asking || !question.trim()}
-              className="rounded-xl bg-black px-6 py-3 font-medium text-white hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-300"
-            >
-              {asking ? "Thinking..." : "Ask"}
-            </button>
-          </div>
-
-          {askError && <p className="mt-4 text-sm text-red-600">{askError}</p>}
-
-          {answer && (
-            <div className="mt-6 rounded-xl bg-gray-50 p-5">
-              <h4 className="font-medium">Answer</h4>
-
-              <p className="mt-3 whitespace-pre-line leading-7 text-gray-700">
-                {answer}
+              <p className="mt-6 max-w-2xl text-base leading-7 text-zinc-500 sm:text-lg">
+                Paste a YouTube video and MindBook transforms it into structured
+                notes, deep explanations, knowledge graphs, quizzes and revision
+                material.
               </p>
             </div>
-          )}
+
+            {/* ================= URL INPUT ================= */}
+            <div className="mt-10 max-w-4xl">
+              <div className="rounded-2xl border border-zinc-200 bg-white p-2 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <div className="flex flex-1 items-center gap-3 px-4">
+                    <span className="text-lg text-zinc-400">🔗</span>
+
+                    <input
+                      type="text"
+                      placeholder="Paste a YouTube URL..."
+                      value={url}
+                      onChange={(event) => setUrl(event.target.value)}
+                      className="min-w-0 flex-1 bg-transparent py-4 text-sm text-zinc-900 outline-none placeholder:text-zinc-400"
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleGenerate}
+                    className="rounded-xl bg-violet-600 px-7 py-3.5 text-sm font-medium text-white shadow-sm transition hover:bg-violet-700 active:scale-[0.98]"
+                  >
+                    Generate MindBook
+                    <span className="ml-2">→</span>
+                  </button>
+                </div>
+              </div>
+
+              {message && (
+                <div className="mt-3 flex items-center gap-2 px-2 text-sm text-zinc-500">
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
+                  {message}
+                </div>
+              )}
+            </div>
+
+            {/* ================= WHAT MINDBOOK CREATES ================= */}
+            {!result && (
+              <div className="mt-20">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-zinc-400">
+                    What MindBook creates
+                  </p>
+
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight text-zinc-900">
+                    One video. A complete learning system.
+                  </h3>
+                </div>
+
+                <div className="mt-7 grid gap-4 md:grid-cols-3">
+                  {/* Summary */}
+                  <div className="group rounded-2xl border border-zinc-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_12px_35px_rgba(124,58,237,0.08)]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-lg text-violet-600">
+                      ✦
+                    </div>
+
+                    <h4 className="mt-5 font-semibold text-zinc-900">
+                      Smart Summary
+                    </h4>
+
+                    <p className="mt-2 text-sm leading-6 text-zinc-500">
+                      Understand the main ideas without going through the entire
+                      video again.
+                    </p>
+                  </div>
+
+                  {/* Deep Dive */}
+                  <div className="group rounded-2xl border border-zinc-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_12px_35px_rgba(124,58,237,0.08)]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-lg text-violet-600">
+                      ◈
+                    </div>
+
+                    <h4 className="mt-5 font-semibold text-zinc-900">
+                      Deep Dive
+                    </h4>
+
+                    <p className="mt-2 text-sm leading-6 text-zinc-500">
+                      Explore concepts with detailed explanations, examples and
+                      connected ideas.
+                    </p>
+                  </div>
+
+                  {/* Study */}
+                  <div className="group rounded-2xl border border-zinc-200 bg-white p-6 transition duration-200 hover:-translate-y-1 hover:border-violet-200 hover:shadow-[0_12px_35px_rgba(124,58,237,0.08)]">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-50 text-lg text-violet-600">
+                      ✧
+                    </div>
+
+                    <h4 className="mt-5 font-semibold text-zinc-900">
+                      Study Assets
+                    </h4>
+
+                    <p className="mt-2 text-sm leading-6 text-zinc-500">
+                      Test yourself with quizzes, timelines and revision
+                      material.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ====================================================== */}
+            {/* KEEP YOUR EXISTING RESULT JSX HERE                     */}
+            {/* ====================================================== */}
+
+            {result && (
+              <div className="mt-12 w-full space-y-6">
+                {/* 
+                   IMPORTANT:
+                   Yahan tera existing result rendering code
+                   temporarily same rahega.
+  
+                   Next step mein isi section ko properly
+                   dashboard/reading UI mein redesign karenge.
+                */}
+
+                {/* MindBook Header */}
+                <div className="rounded-3xl border border-zinc-200 bg-white p-8 shadow-sm">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-600">
+                    MindBook
+                  </p>
+
+                  <h2 className="mt-3 text-3xl font-semibold tracking-tight text-zinc-950">
+                    {result.content.overall_topic}
+                  </h2>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-violet-50 px-3 py-1.5 text-xs font-medium text-violet-700">
+                      {result.content.content_type}
+                    </span>
+
+                    <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-600">
+                      {result.content.difficulty}
+                    </span>
+
+                    <span className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-medium text-zinc-600">
+                      {result.content.domain}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 
+                  DON'T DELETE YOUR OTHER RESULT SECTIONS.
+  
+                  For this first UI step, move your existing:
+                  Executive Summary
+                  Learning Objectives
+                  Topics
+                  Complete Guide
+                  FAQ
+                  Knowledge Graph
+                  Deep Dive
+                  Study Assets
+                  Ask AI
+  
+                  below this header.
+  
+                  We will redesign those individually in Step 2.
+                */}
+              </div>
+            )}
+          </section>
         </div>
       </div>
     </main>
