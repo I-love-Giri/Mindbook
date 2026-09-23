@@ -149,50 +149,60 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-[#F7F7F5] text-[#18181B]">
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-6">
+    <main className="min-h-screen bg-[#0D0D10] text-[#E8E7EC]">
+      <div className="min-h-screen">
         {/* Navbar */}
-        <nav className="flex h-16 items-center justify-between border-b border-[#E5E5E2]">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-[#18181B] text-sm font-semibold text-white">
-              M
+        <nav className="sticky top-0 z-50 h-16 border-b border-white/[0.08] bg-[#0D0D10]/95 backdrop-blur">
+          <div className="mx-auto flex h-full max-w-[1500px] items-center justify-between px-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#B08DFF] font-serif text-lg text-[#0D0D10]">
+                M
+              </div>
+
+              <div>
+                <div className="font-serif text-lg tracking-tight text-white">
+                  MindBook
+                </div>
+                <div className="text-[10px] uppercase tracking-[0.2em] text-[#71717A]">
+                  Learning workspace
+                </div>
+              </div>
             </div>
 
-            <span className="text-[15px] font-semibold tracking-tight">
-              MindBook
-            </span>
+            <div className="flex items-center gap-6 text-sm text-[#8F8D96]">
+              <span className="hidden md:block">Study smarter</span>
+              <button className="border border-white/[0.1] px-4 py-2 text-[#C8C5CF] transition hover:border-[#B08DFF]/50 hover:text-white">
+                My Library
+              </button>
+            </div>
           </div>
-
-          <button className="text-sm text-[#52525B] transition hover:text-[#18181B]">
-            My Library
-          </button>
         </nav>
         {/* Hero Section */}
-        <section className="flex flex-1 flex-col items-center justify-center text-center">
-          <h2 className="max-w-3xl text-5xl font-semibold leading-[1.08] tracking-[-0.035em]">
+        <section className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-[1100px] flex-col items-center justify-center px-6 text-center">
+          <h2 className="max-w-4xl font-serif text-5xl font-normal leading-[1.05] tracking-[-0.025em] text-white md:text-7xl">
             Learn from videos.
             <br />
-            Remember what you learn.
+            <span className="text-[#B08DFF]">Remember what you learn.</span>
           </h2>
 
-          <p className="mt-6 max-w-xl text-[17px] leading-7 text-[#71717A]">
+          <p className="mt-7 max-w-2xl text-[17px] leading-8 text-[#85828D]">
             Turn long lectures and tutorials into clear explanations, connected
             concepts, and study material you can actually use.
           </p>
 
           {/* URL Input */}
-          <div className="mt-10 flex w-full max-w-2xl gap-2">
+          <div className="mt-10 flex w-full max-w-2xl overflow-hidden border border-white/[0.12] bg-[#151519]">
             <input
               type="text"
               placeholder="Paste a YouTube URL"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
-              className="h-12 flex-1 border border-[#D4D4D0] bg-white px-4 text-[15px] outline-none transition placeholder:text-[#A1A1AA] focus:border-[#18181B]"
+              className="h-14 flex-1 bg-transparent px-5 text-[15px] text-white outline-none placeholder:text-[#5F5D66] focus:bg-[#18181D]"
             />
 
             <button
               onClick={handleGenerate}
-              className="h-12 bg-[#18181B] px-6 text-[15px] font-medium text-white transition hover:bg-[#27272A]"
+              className="h-14 bg-[#B08DFF] px-7 text-sm font-semibold text-[#0D0D10] transition hover:bg-[#C2A8FF]"
             >
               Generate
             </button>
@@ -201,9 +211,43 @@ export default function Home() {
           {message && <p className="mt-4 text-gray-600">{message}</p>}
 
           {result && (
-            <div className="mt-12 w-full max-w-5xl text-left space-y-6">
+            <div className="mx-auto mt-16 grid w-full max-w-[1500px] grid-cols-1 gap-0 text-left lg:grid-cols-[230px_minmax(0,1fr)]">
+              <aside className="hidden border-r border-white/[0.08] lg:block">
+                <div className="sticky top-24 p-6">
+                  <div className="mb-8">
+                    <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#5EE7C4]">
+                      Workspace
+                    </p>
+
+                    <div className="space-y-1 text-sm">
+                      <div className="border-l-2 border-[#B08DFF] bg-white/[0.04] px-3 py-2 text-white">
+                        Overview
+                      </div>
+
+                      <div className="px-3 py-2 text-[#77747E]">Knowledge</div>
+
+                      <div className="px-3 py-2 text-[#77747E]">Study</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="mb-4 text-[10px] font-semibold uppercase tracking-[0.2em] text-[#5EE7C4]">
+                      This video
+                    </p>
+
+                    <div className="space-y-1 text-sm text-[#77747E]">
+                      <div className="px-3 py-2">Summary</div>
+                      <div className="px-3 py-2">Deep Dive</div>
+                      <div className="px-3 py-2">Knowledge Graph</div>
+                      <div className="px-3 py-2">Study Assets</div>
+                      <div className="px-3 py-2">Ask AI</div>
+                    </div>
+                  </div>
+                </div>
+              </aside>
+              <div className="min-w-0 px-6 py-2 lg:px-12"></div>
               {/* MindBook Header */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
+              <div className="border border-white/[0.08] bg-[#121216] p-7">
                 <p className="text-sm font-medium text-gray-500">MindBook</p>
 
                 <h2 className="mt-2 text-3xl font-bold text-gray-900">
@@ -227,7 +271,9 @@ export default function Home() {
 
               {/* Executive Summary */}
               <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">⚡ Executive Summary</h3>
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  {" "}
+                </h3>
 
                 <p className="mt-3 leading-7 text-gray-600">
                   {result.synthesis.executive_summary}
@@ -236,7 +282,7 @@ export default function Home() {
 
               {/* Learning Objectives */}
               <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
                   🎯 Learning Objectives
                 </h3>
 
@@ -254,7 +300,9 @@ export default function Home() {
 
               {/* Topics */}
               <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">📚 Topics Covered</h3>
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  📚 Topics Covered
+                </h3>
 
                 <div className="mt-4 space-y-4">
                   {result.content.topics.map((topic: any, index: number) => (
@@ -271,7 +319,9 @@ export default function Home() {
 
               {/* Complete Guide */}
               <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">📖 Complete Guide</h3>
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  📖 Complete Guide
+                </h3>
 
                 <div className="mt-4 whitespace-pre-line leading-7 text-gray-600">
                   {result.synthesis.complete_guide}
@@ -280,7 +330,7 @@ export default function Home() {
 
               {/* FAQ */}
               <div className="rounded-2xl border p-6">
-                <h3 className="text-xl font-semibold">
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
                   ❓ Frequently Asked Questions
                 </h3>
 
@@ -298,8 +348,10 @@ export default function Home() {
               </div>
 
               {/* Knowledge Graph */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">🕸️ Knowledge Graph</h3>
+              <div className="border border-white/[0.08] bg-[#121216] p-7">
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  🕸️ Knowledge Graph
+                </h3>
 
                 {/* Nodes */}
                 <div className="mt-6">
@@ -364,7 +416,9 @@ export default function Home() {
 
               {/* Deep Dive */}
               <div className="border-t border-[#E5E5E2] pt-10">
-                <h3 className="text-xl font-semibold">🔍 Deep Dive</h3>
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  🔍 Deep Dive
+                </h3>
 
                 <div className="mt-6 space-y-6">
                   {result.deep_dive.map((chunk: any, index: number) => (
@@ -458,8 +512,10 @@ export default function Home() {
               </div>
 
               {/* Study Assets */}
-              <div className="rounded-2xl border bg-white p-6 shadow-sm">
-                <h3 className="text-xl font-semibold">🎯 Study Assets</h3>
+              <div className="border border-white/[0.08] bg-[#121216] p-7">
+                <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+                  🎯 Study Assets
+                </h3>
 
                 {/* Quiz */}
                 <div className="mt-6">
@@ -682,8 +738,10 @@ export default function Home() {
         </section>
 
         {/* Ask AI / RAG */}
-        <div className="rounded-2xl border bg-white p-6 shadow-sm">
-          <h3 className="text-xl font-semibold">💬 Ask about this video</h3>
+        <div className="border border-white/[0.08] bg-[#121216] p-7">
+          <h3 className="font-serif text-3xl font-normal tracking-tight text-white">
+            💬 Ask about this video
+          </h3>
 
           <p className="mt-2 text-sm text-gray-500">
             Ask questions about the concepts explained in this video.
