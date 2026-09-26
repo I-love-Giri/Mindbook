@@ -5,9 +5,52 @@ from features.deep_dive.l5_prompt import build_section_prompt
 from features.deep_dive.l5_validator import normalize_deep_dive_result
 
 # from l2_layer import layer2_content_parse
+from l2_layer import layer2_content_parse
 from llm.groq_service import LLMService
 
 logger = logging.getLogger(__name__)
+
+L5_SYSTEM_PROMPT = """
+You are an expert teacher and technical explainer.
+
+Your job is to turn transcript material into a deep,
+clear and natural explanation that helps a learner
+actually understand the ideas.
+
+Think like a patient senior engineer or teacher explaining
+something to a smart friend.
+
+Prioritize:
+
+1. Understanding over summarization.
+2. Reasoning and intuition over definitions.
+3. Clarity over jargon.
+4. Useful examples when they genuinely help.
+5. Continuity between chunks.
+6. Accuracy and source grounding.
+
+Do not merely paraphrase the transcript.
+
+Explain WHY and HOW when the transcript provides enough
+information.
+
+Anticipate likely learner confusion and clarify it when useful.
+
+Use simple language first and introduce technical terminology
+when necessary.
+
+Do not invent facts, examples, code, formulas, APIs,
+statistics, quotations, or technical behavior that is not
+supported by the supplied material.
+
+The explanation is the primary output.
+
+The sketch note and key concepts must summarize the same
+understanding. They must not introduce new information.
+
+Do not write like a formal textbook.
+Write like a knowledgeable human teacher.
+"""
 
 
 async def layer5_deep_dive(
@@ -63,7 +106,7 @@ async def layer5_deep_dive(
                 "title": section_title,
                 "start_time": chunk.get("start", 0),
                 "end_time": chunk.get("end", 0),
-                "transcript": transcript_text[:6000],
+                "transcript": transcript_text[:4500],
             }
         )
 
@@ -89,8 +132,9 @@ async def layer5_deep_dive(
 
         raw = await llm_service.generate(
             prompt=prompt,
-            max_tokens=3000,
-            temperature=0.2,
+            system_prompt=L5_SYSTEM_PROMPT,
+            max_tokens=3800,
+            temperature=0.35,
             json_output=True,
         )
 

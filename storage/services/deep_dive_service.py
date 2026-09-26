@@ -1,4 +1,6 @@
-from typing import Optional
+from typing import Awaitable, Callable, Optional
+import asyncio
+import inspect
 
 from cache.memory_cache import MemoryCache
 from l5_layer import layer5_deep_dive
@@ -13,6 +15,7 @@ from storage.services.transcript_service import TranscriptService
 class DeepDiveService:
 
     BATCH_SIZE = 1
+    REQUEST_GAP_SECONDS = 1.2
 
     def __init__(
         self,
@@ -58,6 +61,9 @@ class DeepDiveService:
     async def get(
         self,
         video_id: str,
+        on_batch: (
+            Callable[[list[dict], int, int], Awaitable[None] | None] | None
+        ) = None,
     ) -> list[dict] | None:
 
         # --------------------------------------------------
@@ -70,6 +76,11 @@ class DeepDiveService:
 
             print("Cache Hit")
 
+            if on_batch:
+                for index, item in enumerate(cached):
+                    emitted = on_batch([item], index, len(cached))
+                    if inspect.isawaitable(emitted):
+                        await emitted
             return cached
 
         # --------------------------------------------------
@@ -87,6 +98,11 @@ class DeepDiveService:
                 stored,
             )
 
+            if on_batch:
+                for index, item in enumerate(stored):
+                    emitted = on_batch([item], index, len(stored))
+                    if inspect.isawaitable(emitted):
+                        await emitted
             return stored
 
         # --------------------------------------------------
@@ -132,7 +148,8 @@ class DeepDiveService:
 
         print(f"\nGenerated {len(chunks)} chunks")
 
-        self.rag_index_service.index_chunks(chunks)
+        if self.rag_index_service is not None:
+            self.rag_index_service.index_chunks(chunks)
 
         # --------------------------------------------------
         # 7. Process chunks in REAL batches
@@ -176,7 +193,15 @@ class DeepDiveService:
 
             all_results.extend(batch_results)
 
+            if on_batch and batch_results:
+                emitted = on_batch(batch_results, start, len(chunks))
+                if inspect.isawaitable(emitted):
+                    await emitted
+
             print("✓ Batch completed")
+
+            if start + self.BATCH_SIZE < len(chunks):
+                await asyncio.sleep(self.REQUEST_GAP_SECONDS)
 
         # --------------------------------------------------
         # 8. Save ONE document

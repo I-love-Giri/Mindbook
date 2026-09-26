@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from enum import Enum
@@ -53,6 +54,10 @@ class ModelType(str, Enum):
 
 class OpenrouterService:
 
+    _request_lock = asyncio.Lock()
+    _next_request_at = 0.0
+    _minimum_request_gap_seconds = 1.2
+
     def __init__(self):
 
         self.client = AsyncOpenAI(
@@ -105,7 +110,7 @@ class OpenrouterService:
     async def generate(
         self,
         prompt: str,
-        model_type: ModelType = ModelType.TEXT,
+        model_type: ModelType = ModelType.FAST,
         system_prompt: str = DEFAULT_SYSTEM_PROMPT,
         temperature: float = 0.7,
         max_tokens: int = 3000,
@@ -203,9 +208,30 @@ class OpenrouterService:
         # API CALL
         # ----------------------------------------------------
 
-        response = await self.client.chat.completions.create(
-            **request_kwargs,
-        )
+        async with self._request_lock:
+            loop = asyncio.get_running_loop()
+            wait_for = self._next_request_at - loop.time()
+            if wait_for > 0:
+                await asyncio.sleep(wait_for)
+            self._next_request_at = loop.time() + self._minimum_request_gap_seconds
+            try:
+                response = await self.client.chat.completions.create(
+                    **request_kwargs,
+                )
+            except RateLimitError as exc:
+                # Respect a provider cooldown when it is supplied. The retry
+                # decorator then retries only after this shared gate opens.
+                retry_after = 0.0
+                headers = getattr(getattr(exc, "response", None), "headers", {})
+                try:
+                    retry_after = float(headers.get("retry-after", 0))
+                except (TypeError, ValueError):
+                    retry_after = 0.0
+                self._next_request_at = max(
+                    self._next_request_at,
+                    loop.time() + max(retry_after, self._minimum_request_gap_seconds),
+                )
+                raise
 
         # ----------------------------------------------------
         # Extract response

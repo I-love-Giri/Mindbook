@@ -19,8 +19,169 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* --------------------------------------------------
+   Custom scrollbar (dark, matches the workspace theme)
+-------------------------------------------------- */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0b0b0f;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2830;
+  border-radius: 999px;
+  border: 2px solid #0b0b0f;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a3742;
+}
+
+/* --------------------------------------------------
+   Visible keyboard focus everywhere
+-------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid #b08dff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* --------------------------------------------------
+   Keyframes
+-------------------------------------------------- */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.25);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -300px 0;
+  }
+  100% {
+    background-position: 300px 0;
+  }
+}
+
+@keyframes floatGlow {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.06;
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 0.1;
+  }
+}
+
+/* --------------------------------------------------
+   Reusable animation utilities
+-------------------------------------------------- */
+.animate-fade-up {
+  animation: fadeInUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.5s ease both;
+}
+
+.animate-check-pop {
+  animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+
+.animate-float-glow {
+  animation: floatGlow 8s ease-in-out infinite;
+}
+
+.shimmer-bg {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  background-size: 300px 100%;
+  background-repeat: no-repeat;
+  animation: shimmer 1.8s ease-in-out infinite;
+}
+
+/* Press / hover micro-interaction for buttons and tabs */
+.btn-press {
+  transition: transform 150ms ease, background-color 150ms ease,
+    border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+.btn-press:hover {
+  transform: translateY(-1px);
+}
+.btn-press:active {
+  transform: scale(0.97) translateY(0);
+}
+.btn-press:disabled {
+  transform: none;
+}
+
+/* Stagger helper — pair with inline style="--d: 1" */
+.stagger {
+  animation-delay: calc(var(--d, 0) * 90ms);
+}
+
+/* --------------------------------------------------
+   Respect reduced motion
+-------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

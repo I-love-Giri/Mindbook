@@ -1,5 +1,9 @@
+import asyncio
+import json
+
 from fastapi import BackgroundTasks, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from storage.services.ContentParseService import ContentParseService
@@ -16,6 +20,7 @@ from pipeline.vectorstore.qdrant_store import QdrantStore
 from pipeline.retrieval.retriever import Retriever
 from pipeline.rag.context_builder import ContextBuilder
 from pipeline.rag.generator import Generator
+from pipeline.rag.rag_index_service import RAGIndexService
 
 processing_status = {}
 
@@ -94,6 +99,11 @@ class AskRequest(BaseModel):
     question: str
 
 
+def sse(payload: dict) -> str:
+    """Encode a single Server-Sent Event payload."""
+    return f"data: {json.dumps(payload, default=str)}\n\n"
+
+
 # --------------------------------------------------
 # Health
 # --------------------------------------------------
@@ -154,6 +164,145 @@ def process_video(
         "status": "processing",
         "video_id": video_id,
     }
+
+
+@app.post("/process/stream")
+async def process_video_stream(request: VideoRequest):
+    """Run the pipeline once and expose genuine, incremental progress to the UI."""
+    video_id = extract_video_id(request.url)
+
+    async def event_stream():
+        services = []
+        try:
+            yield sse(
+                {
+                    "type": "status",
+                    "stage": 0,
+                    "message": "Fetching transcript and metadata…",
+                }
+            )
+            content_service = ContentParseService()
+            kg_service = KGService()
+            deep_dive_service = DeepDiveService(
+                rag_index_service=RAGIndexService(vector_store)
+            )
+            synthesis_service = SynthesisService()
+            study_assets_service = StudyAssetsService()
+            services = [
+                content_service,
+                kg_service,
+                deep_dive_service,
+                synthesis_service,
+                study_assets_service,
+            ]
+
+            content = await content_service.get(video_id)
+            if content is None:
+                raise RuntimeError("Could not retrieve or parse the video transcript.")
+            yield sse(
+                {
+                    "type": "content",
+                    "stage": 1,
+                    "content": content,
+                    "message": "Transcript parsed.",
+                }
+            )
+
+            yield sse(
+                {
+                    "type": "status",
+                    "stage": 1,
+                    "message": "Mapping the knowledge graph…",
+                }
+            )
+            knowledge_graph = await kg_service.get(video_id)
+            yield sse(
+                {
+                    "type": "knowledge_graph",
+                    "stage": 2,
+                    "knowledge_graph": knowledge_graph,
+                    "message": "Knowledge graph ready.",
+                }
+            )
+
+            yield sse(
+                {
+                    "type": "status",
+                    "stage": 2,
+                    "message": "Writing the deep dive, chapter by chapter…",
+                }
+            )
+            batch_queue: asyncio.Queue[tuple[list[dict], int, int]] = asyncio.Queue()
+
+            async def on_batch(batch: list[dict], start: int, total: int):
+                await batch_queue.put((batch, start, total))
+
+            deep_task = asyncio.create_task(
+                deep_dive_service.get(video_id, on_batch=on_batch)
+            )
+            received = 0
+            while not deep_task.done() or not batch_queue.empty():
+                try:
+                    batch, start, total = await asyncio.wait_for(
+                        batch_queue.get(), timeout=0.25
+                    )
+                except TimeoutError:
+                    continue
+                for offset, section in enumerate(batch):
+                    received += 1
+                    yield sse(
+                        {
+                            "type": "deep_dive_section",
+                            "stage": 2,
+                            "section": section,
+                            "section_index": start + offset,
+                            "total": total,
+                            "received": received,
+                            "message": f"Chapter {received}/{total} is ready.",
+                        }
+                    )
+            deep_dive = await deep_task
+
+            yield sse(
+                {
+                    "type": "status",
+                    "stage": 3,
+                    "message": "Synthesizing the learning guide…",
+                }
+            )
+            synthesis = await synthesis_service.get(video_id)
+            yield sse({"type": "synthesis", "stage": 3, "synthesis": synthesis})
+
+            yield sse(
+                {"type": "status", "stage": 4, "message": "Building study assets…"}
+            )
+            study_assets = await study_assets_service.get(video_id)
+            yield sse(
+                {
+                    "type": "complete",
+                    "stage": 4,
+                    "message": "MindBook is ready.",
+                    "result": {
+                        "video_id": video_id,
+                        "content": content,
+                        "knowledge_graph": knowledge_graph,
+                        "deep_dive": deep_dive,
+                        "synthesis": synthesis,
+                        "study_assets": study_assets,
+                    },
+                }
+            )
+        except Exception as exc:
+            yield sse({"type": "error", "message": str(exc) or "Processing failed."})
+        finally:
+            for service in services:
+                service.close()
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 # --------------------------------------------------
