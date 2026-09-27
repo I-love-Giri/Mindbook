@@ -19,31 +19,57 @@ type DeepDiveBlock = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type MindBookResult = any;
 
-type Tab =
-  | "executive"
-  | "deep-dive"
-  | "knowledge"
-  | "guide"
-  | "study"
-  | "ask";
+type Tab = "executive" | "deep-dive" | "knowledge" | "guide" | "study" | "ask";
 
 // ============================================================
 //  STAGES
 // ============================================================
 const STAGES = [
-  { label: "Parsing the video", detail: "Fetching the transcript and metadata", icon: "📡" },
-  { label: "Mapping the knowledge graph", detail: "Extracting concepts and how they connect", icon: "🧠" },
-  { label: "Writing the deep dive", detail: "Building chunk-by-chunk explanations", icon: "📝" },
-  { label: "Synthesizing the guide", detail: "Writing the summary and FAQ", icon: "✨" },
-  { label: "Building study assets", detail: "Generating the quiz, timeline and mind map", icon: "🎯" },
+  {
+    label: "Parsing the video",
+    detail: "Fetching the transcript and metadata",
+    icon: "📡",
+  },
+  {
+    label: "Mapping the knowledge graph",
+    detail: "Extracting concepts and how they connect",
+    icon: "🧠",
+  },
+  {
+    label: "Writing the deep dive",
+    detail: "Building chunk-by-chunk explanations",
+    icon: "📝",
+  },
+  {
+    label: "Synthesizing the guide",
+    detail: "Writing the summary and FAQ",
+    icon: "✨",
+  },
+  {
+    label: "Building study assets",
+    detail: "Generating the quiz, timeline and mind map",
+    icon: "🎯",
+  },
 ];
 
 const TABS: { id: Tab; label: string; description: string }[] = [
-  { id: "executive", label: "Executive Summary", description: "The big picture" },
+  {
+    id: "executive",
+    label: "Executive Summary",
+    description: "The big picture",
+  },
   { id: "deep-dive", label: "Deep Dive", description: "Detailed breakdowns" },
-  { id: "knowledge", label: "Knowledge Graph", description: "Concepts & connections" },
+  {
+    id: "knowledge",
+    label: "Knowledge Graph",
+    description: "Concepts & connections",
+  },
   { id: "guide", label: "Complete Guide", description: "Full walkthrough" },
-  { id: "study", label: "Study & Quiz", description: "Test your understanding" },
+  {
+    id: "study",
+    label: "Study & Quiz",
+    description: "Test your understanding",
+  },
   { id: "ask", label: "Ask AI", description: "Ask anything" },
 ];
 
@@ -86,7 +112,9 @@ function RevealSection({
   return (
     <div
       ref={ref}
-      className={`${stagger ? "reveal-stagger" : "reveal"} ${visible ? "visible" : ""} ${className}`}
+      className={`${stagger ? "reveal-stagger" : "reveal"} ${
+        visible ? "visible" : ""
+      } ${className}`}
     >
       {children}
     </div>
@@ -105,16 +133,18 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
     );
 
   if (block.type === "paragraph")
-    return (
-      <p className="prose-editorial">{block.content}</p>
-    );
+    return <p className="prose-editorial">{block.content}</p>;
 
   if (block.type === "code")
     return (
       <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#080808]">
         <div className="flex justify-between border-b border-[var(--border)] px-5 py-3 text-xs">
-          <span className="text-[var(--accent)]">{block.caption || "Example"}</span>
-          <span className="text-[var(--text-muted)]">{block.language || "text"}</span>
+          <span className="text-[var(--accent)]">
+            {block.caption || "Example"}
+          </span>
+          <span className="text-[var(--text-muted)]">
+            {block.language || "text"}
+          </span>
         </div>
         <pre className="overflow-x-auto p-5 text-sm leading-7 text-[var(--text-secondary)]">
           <code>{block.content}</code>
@@ -127,7 +157,10 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
       .split("\n")
       .filter((row: string) => row.trim() && !/^\s*\|?\s*:?-+/.test(row));
     const cells = (row: string) =>
-      row.split("|").map((cell) => cell.trim()).filter(Boolean);
+      row
+        .split("|")
+        .map((cell) => cell.trim())
+        .filter(Boolean);
     const [head, ...body] = rows.map(cells);
     return (
       <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
@@ -135,7 +168,12 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
           <thead className="bg-white/[0.03] text-[var(--text-primary)]">
             <tr>
               {head?.map((cell: string, index: number) => (
-                <th className="border-b border-[var(--border)] px-5 py-4 font-medium" key={index}>{cell}</th>
+                <th
+                  className="border-b border-[var(--border)] px-5 py-4 font-medium"
+                  key={index}
+                >
+                  {cell}
+                </th>
               ))}
             </tr>
           </thead>
@@ -143,7 +181,12 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
             {body.map((row: string[], rowIndex: number) => (
               <tr key={rowIndex}>
                 {row.map((cell, cellIndex) => (
-                  <td className="border-b border-[var(--border)] px-5 py-4 last:border-0" key={cellIndex}>{cell}</td>
+                  <td
+                    className="border-b border-[var(--border)] px-5 py-4 last:border-0"
+                    key={cellIndex}
+                  >
+                    {cell}
+                  </td>
                 ))}
               </tr>
             ))}
@@ -195,8 +238,12 @@ export default function Home() {
   const [stageIndex, setStageIndex] = useState(0);
   const [activeTab, setActiveTab] = useState<Tab>("executive");
 
-  const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: string }>({});
-  const [checkedAnswers, setCheckedAnswers] = useState<{ [key: number]: boolean }>({});
+  const [selectedAnswers, setSelectedAnswers] = useState<{
+    [key: number]: string;
+  }>({});
+  const [checkedAnswers, setCheckedAnswers] = useState<{
+    [key: number]: boolean;
+  }>({});
 
   // hero typing effect
   const [heroReady, setHeroReady] = useState(false);
@@ -217,11 +264,18 @@ export default function Home() {
   //  API HANDLERS (unchanged logic)
   // ============================================================
   const handleGenerate = useCallback(async () => {
-    if (!url.trim()) { setMessage("Please enter a YouTube URL."); return; }
-    setMessage(""); setResult(null); setStageIndex(0); setPhase("processing");
+    if (!url.trim()) {
+      setMessage("Please enter a YouTube URL.");
+      return;
+    }
+    setMessage("");
+    setResult(null);
+    setStageIndex(0);
+    setPhase("processing");
     try {
       const response = await fetch("http://127.0.0.1:8000/process/stream", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
       });
       if (!response.ok) throw new Error("Request failed");
@@ -236,22 +290,37 @@ export default function Home() {
         const events = buffer.split("\n\n");
         buffer = events.pop() || "";
         for (const event of events) {
-          const line = event.split("\n").find((item) => item.startsWith("data: "));
+          const line = event
+            .split("\n")
+            .find((item) => item.startsWith("data: "));
           if (!line) continue;
           const eventData = JSON.parse(line.slice(6));
           if (eventData.message) setMessage(eventData.message);
-          if (typeof eventData.stage === "number") setStageIndex(eventData.stage);
+          if (typeof eventData.stage === "number")
+            setStageIndex(eventData.stage);
           if (eventData.type === "error") throw new Error(eventData.message);
           if (eventData.type === "content") {
             setResult({
-              video_id: "", content: { learning_objectives: [], topics: [], ...eventData.content },
-              knowledge_graph: { nodes: [], edges: [] }, deep_dive: [],
+              video_id: "",
+              content: {
+                learning_objectives: [],
+                topics: [],
+                ...eventData.content,
+              },
+              knowledge_graph: { nodes: [], edges: [] },
+              deep_dive: [],
               synthesis: { executive_summary: "", complete_guide: "", faq: [] },
-              study_assets: { quiz: [], concept_timeline: [], mind_map_text: "" },
+              study_assets: {
+                quiz: [],
+                concept_timeline: [],
+                mind_map_text: "",
+              },
             });
           }
           if (eventData.type === "knowledge_graph")
-            setResult((c: MindBookResult | null) => c ? { ...c, knowledge_graph: eventData.knowledge_graph } : c);
+            setResult((c: MindBookResult | null) =>
+              c ? { ...c, knowledge_graph: eventData.knowledge_graph } : c
+            );
           if (eventData.type === "deep_dive_section")
             setResult((c: MindBookResult | null) => {
               if (!c) return c;
@@ -260,7 +329,9 @@ export default function Home() {
               return { ...c, deep_dive: dd.filter(Boolean) };
             });
           if (eventData.type === "synthesis")
-            setResult((c: MindBookResult | null) => c ? { ...c, synthesis: eventData.synthesis } : c);
+            setResult((c: MindBookResult | null) =>
+              c ? { ...c, synthesis: eventData.synthesis } : c
+            );
           if (eventData.type === "complete") {
             setVideoId(eventData.result.video_id);
             setResult(eventData.result);
@@ -271,30 +342,43 @@ export default function Home() {
       }
     } catch (error) {
       console.error(error);
-      setResult(null); setMessage("Could not connect to FastAPI."); setPhase("failed");
+      setResult(null);
+      setMessage("Could not connect to FastAPI.");
+      setPhase("failed");
     }
   }, [url]);
 
   const handleAsk = useCallback(async () => {
     if (!question.trim()) return;
-    if (!videoId) { setAskError("Please generate a MindBook first."); return; }
-    setAsking(true); setAnswer(""); setAskError("");
+    if (!videoId) {
+      setAskError("Please generate a MindBook first.");
+      return;
+    }
+    setAsking(true);
+    setAnswer("");
+    setAskError("");
     try {
       const response = await fetch("http://127.0.0.1:8000/ask", {
-        method: "POST", headers: { "Content-Type": "application/json" },
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: videoId, question }),
       });
       if (!response.ok) throw new Error("Failed to get answer");
       const data = await response.json();
       setAnswer(data.answer);
     } catch (error) {
-      console.error(error); setAskError("Could not get an answer.");
-    } finally { setAsking(false); }
+      console.error(error);
+      setAskError("Could not get an answer.");
+    } finally {
+      setAsking(false);
+    }
   }, [question, videoId]);
 
   const goToTab = (id: Tab) => {
     setActiveTab(id);
-    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    document
+      .getElementById(id)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   // ============================================================
@@ -365,7 +449,11 @@ export default function Home() {
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={heroReady ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.9, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
+              transition={{
+                duration: 0.9,
+                delay: 0.1,
+                ease: [0.16, 1, 0.3, 1],
+              }}
               className="font-serif text-5xl font-normal leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] sm:text-6xl md:text-7xl lg:text-[5.5rem]"
             >
               Understand any video.
@@ -379,10 +467,16 @@ export default function Home() {
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={heroReady ? { opacity: 1, y: 0 } : {}}
-              transition={{ duration: 0.7, delay: 0.25, ease: [0.16, 1, 0.3, 1] }}
+              transition={{
+                duration: 0.7,
+                delay: 0.25,
+                ease: [0.16, 1, 0.3, 1],
+              }}
               className="mx-auto mt-8 max-w-xl text-lg leading-relaxed text-[var(--text-tertiary)]"
             >
-              Paste a lecture, tutorial, or talk. MindBook transforms it into clear explanations, connected concepts, and study material you'll actually remember.
+              Paste a lecture, tutorial, or talk. MindBook transforms it into
+              clear explanations, connected concepts, and study material you'll
+              actually remember.
             </motion.p>
 
             {/* Input or processing */}
@@ -390,7 +484,11 @@ export default function Home() {
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={heroReady ? { opacity: 1, y: 0 } : {}}
-                transition={{ duration: 0.7, delay: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                transition={{
+                  duration: 0.7,
+                  delay: 0.4,
+                  ease: [0.16, 1, 0.3, 1],
+                }}
                 className="mx-auto mt-12 max-w-2xl"
               >
                 <div className="flex overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-300 focus-within:border-[var(--accent)]/40 focus-within:shadow-[0_0_40px_rgba(196,160,255,0.06)]">
@@ -399,7 +497,9 @@ export default function Home() {
                     placeholder="Paste a YouTube URL…"
                     value={url}
                     onChange={(e) => setUrl(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter") handleGenerate(); }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleGenerate();
+                    }}
                     className="h-14 min-w-0 flex-1 bg-transparent px-6 text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
                   />
                   <button
@@ -411,7 +511,9 @@ export default function Home() {
                 </div>
 
                 {message && (phase === "idle" || phase === "failed") && (
-                  <p className="animate-fade-in mt-4 text-sm text-[var(--text-tertiary)]">{message}</p>
+                  <p className="animate-fade-in mt-4 text-sm text-[var(--text-tertiary)]">
+                    {message}
+                  </p>
                 )}
               </motion.div>
             ) : (
@@ -438,7 +540,9 @@ export default function Home() {
                     <motion.div
                       className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--mint)]"
                       initial={{ width: 0 }}
-                      animate={{ width: `${((stageIndex + 1) / STAGES.length) * 100}%` }}
+                      animate={{
+                        width: `${((stageIndex + 1) / STAGES.length) * 100}%`,
+                      }}
                       transition={{ duration: 0.8, ease: "easeOut" }}
                     />
                   </div>
@@ -448,15 +552,32 @@ export default function Home() {
                       const done = i < stageIndex;
                       const active = i === stageIndex;
                       return (
-                        <div key={stage.label} className="flex items-start gap-3">
-                          <div className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs transition-all ${
-                            done ? "bg-[var(--mint-dim)] text-[var(--mint)]"
-                              : active ? "bg-[var(--accent-dim)] text-[var(--accent)]"
-                              : "bg-white/[0.04] text-[var(--text-muted)]"
-                          }`}>
+                        <div
+                          key={stage.label}
+                          className="flex items-start gap-3"
+                        >
+                          <div
+                            className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs transition-all ${
+                              done
+                                ? "bg-[var(--mint-dim)] text-[var(--mint)]"
+                                : active
+                                ? "bg-[var(--accent-dim)] text-[var(--accent)]"
+                                : "bg-white/[0.04] text-[var(--text-muted)]"
+                            }`}
+                          >
                             {done ? (
-                              <svg className="animate-check-pop h-3 w-3" viewBox="0 0 20 20" fill="none">
-                                <path d="M5 10l3 3 7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              <svg
+                                className="animate-check-pop h-3 w-3"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                              >
+                                <path
+                                  d="M5 10l3 3 7-7"
+                                  stroke="currentColor"
+                                  strokeWidth="2"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
                               </svg>
                             ) : active ? (
                               <span className="h-2 w-2 animate-pulse rounded-full bg-current" />
@@ -465,10 +586,22 @@ export default function Home() {
                             )}
                           </div>
                           <div>
-                            <p className={`text-sm ${done ? "text-[var(--text-secondary)]" : active ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"}`}>
+                            <p
+                              className={`text-sm ${
+                                done
+                                  ? "text-[var(--text-secondary)]"
+                                  : active
+                                  ? "text-[var(--text-primary)]"
+                                  : "text-[var(--text-muted)]"
+                              }`}
+                            >
                               {stage.label}
                             </p>
-                            {active && <p className="animate-fade-in mt-0.5 text-xs text-[var(--text-tertiary)]">{stage.detail}</p>}
+                            {active && (
+                              <p className="animate-fade-in mt-0.5 text-xs text-[var(--text-tertiary)]">
+                                {stage.detail}
+                              </p>
+                            )}
                           </div>
                         </div>
                       );
@@ -485,8 +618,16 @@ export default function Home() {
               transition={{ duration: 1, delay: 0.6 }}
               className="mx-auto mt-20 flex flex-wrap items-center justify-center gap-3"
             >
-              {["Executive summaries", "Knowledge graphs", "Deep dive explanations", "Interactive quizzes", "AI Q&A"].map((f) => (
-                <span key={f} className="chip chip--ghost">{f}</span>
+              {[
+                "Executive summaries",
+                "Knowledge graphs",
+                "Deep dive explanations",
+                "Interactive quizzes",
+                "AI Q&A",
+              ].map((f) => (
+                <span key={f} className="chip chip--ghost">
+                  {f}
+                </span>
               ))}
             </motion.div>
           </div>
@@ -515,7 +656,9 @@ export default function Home() {
                     <button
                       key={tab.id}
                       onClick={() => goToTab(tab.id)}
-                      className={`sidebar-link btn-press w-full text-left ${activeTab === tab.id ? "sidebar-link--active" : ""}`}
+                      className={`sidebar-link btn-press w-full text-left ${
+                        activeTab === tab.id ? "sidebar-link--active" : ""
+                      }`}
                     >
                       {tab.label}
                     </button>
@@ -524,9 +667,17 @@ export default function Home() {
               </div>
 
               <div className="mt-12 border-t border-[var(--border)] pt-6">
-                <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">Status</p>
+                <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
+                  Status
+                </p>
                 <div className="mt-3 flex items-center gap-2 px-3 text-xs text-[var(--text-tertiary)]">
-                  <span className={`h-1.5 w-1.5 rounded-full ${phase === "done" ? "bg-[var(--mint)]" : "animate-pulse bg-[var(--accent)]"}`} />
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      phase === "done"
+                        ? "bg-[var(--mint)]"
+                        : "animate-pulse bg-[var(--accent)]"
+                    }`}
+                  />
                   {phase === "done" ? "MindBook ready" : message || "Building…"}
                 </div>
               </div>
@@ -535,7 +686,6 @@ export default function Home() {
 
           {/* ====== MAIN CONTENT ====== */}
           <div className="min-w-0 px-6 py-8 md:px-10 lg:px-16 lg:py-12">
-
             {/* ====== HERO HEADER ====== */}
             <RevealSection className="pb-12">
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
@@ -547,9 +697,15 @@ export default function Home() {
                 {result.content.overall_topic}
               </h1>
               <div className="mt-6 flex flex-wrap gap-2">
-                <span className="chip chip--accent">{result.content.content_type}</span>
-                <span className="chip chip--ghost">{result.content.difficulty}</span>
-                <span className="chip chip--ghost">{result.content.domain}</span>
+                <span className="chip chip--accent">
+                  {result.content.content_type}
+                </span>
+                <span className="chip chip--ghost">
+                  {result.content.difficulty}
+                </span>
+                <span className="chip chip--ghost">
+                  {result.content.domain}
+                </span>
               </div>
             </RevealSection>
 
@@ -597,14 +753,21 @@ export default function Home() {
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                     What you'll learn
                   </p>
-                  {result.content.learning_objectives.map((obj: string, i: number) => (
-                    <div key={i} className="flex gap-4 border-b border-[var(--border)] py-5 last:border-0">
-                      <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-xs font-medium text-[var(--accent)]">
-                        {i + 1}
-                      </span>
-                      <p className="text-base leading-relaxed text-[var(--text-secondary)]">{obj}</p>
-                    </div>
-                  ))}
+                  {result.content.learning_objectives.map(
+                    (obj: string, i: number) => (
+                      <div
+                        key={i}
+                        className="flex gap-4 border-b border-[var(--border)] py-5 last:border-0"
+                      >
+                        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-xs font-medium text-[var(--accent)]">
+                          {i + 1}
+                        </span>
+                        <p className="text-base leading-relaxed text-[var(--text-secondary)]">
+                          {obj}
+                        </p>
+                      </div>
+                    )
+                  )}
                 </RevealSection>
               )}
 
@@ -638,8 +801,12 @@ export default function Home() {
                   <div className="space-y-8">
                     {result.synthesis.faq.map((item: any, i: number) => (
                       <div key={i}>
-                        <h4 className="font-serif text-xl text-[var(--text-primary)]">{item.q}</h4>
-                        <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-tertiary)]">{item.a}</p>
+                        <h4 className="font-serif text-xl text-[var(--text-primary)]">
+                          {item.q}
+                        </h4>
+                        <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-tertiary)]">
+                          {item.a}
+                        </p>
                       </div>
                     ))}
                   </div>
@@ -661,7 +828,8 @@ export default function Home() {
                   Detailed Breakdown
                 </h2>
                 <p className="mt-3 max-w-2xl text-base text-[var(--text-tertiary)]">
-                  Each concept explained in depth, organized as a learning journey.
+                  Each concept explained in depth, organized as a learning
+                  journey.
                 </p>
               </RevealSection>
 
@@ -692,11 +860,17 @@ export default function Home() {
                       {/* Key concepts */}
                       {chunk.result.key_concepts?.length > 0 && (
                         <div className="mt-10">
-                          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">Key Concepts</p>
+                          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
+                            Key Concepts
+                          </p>
                           <div className="flex flex-wrap gap-2">
-                            {chunk.result.key_concepts.map((c: string, ci: number) => (
-                              <span key={ci} className="graph-node">{c}</span>
-                            ))}
+                            {chunk.result.key_concepts.map(
+                              (c: string, ci: number) => (
+                                <span key={ci} className="graph-node">
+                                  {c}
+                                </span>
+                              )
+                            )}
                           </div>
                         </div>
                       )}
@@ -704,21 +878,36 @@ export default function Home() {
                       {/* Sketch note */}
                       {chunk.result.sketch_note && (
                         <div className="mt-10 content-card p-6">
-                          <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">Visual Note</p>
-                          <h4 className="mt-2 font-serif text-xl text-[var(--text-primary)]">{chunk.result.sketch_note.title}</h4>
-                          <p className="mt-1 text-xs text-[var(--text-muted)]">{chunk.result.sketch_note.subtitle}</p>
+                          <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
+                            Visual Note
+                          </p>
+                          <h4 className="mt-2 font-serif text-xl text-[var(--text-primary)]">
+                            {chunk.result.sketch_note.title}
+                          </h4>
+                          <p className="mt-1 text-xs text-[var(--text-muted)]">
+                            {chunk.result.sketch_note.subtitle}
+                          </p>
                           <ul className="mt-5 space-y-3">
-                            {chunk.result.sketch_note.boxes?.map((box: string, bi: number) => (
-                              <li key={bi} className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]">
-                                <span className="text-[var(--mint)]">—</span>
-                                <span>{box}</span>
-                              </li>
-                            ))}
+                            {chunk.result.sketch_note.boxes?.map(
+                              (box: string, bi: number) => (
+                                <li
+                                  key={bi}
+                                  className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]"
+                                >
+                                  <span className="text-[var(--mint)]">—</span>
+                                  <span>{box}</span>
+                                </li>
+                              )
+                            )}
                           </ul>
                           {chunk.result.sketch_note.takeaway && (
                             <div className="mt-6 border-t border-[var(--border)] pt-5">
-                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">Takeaway</p>
-                              <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">{chunk.result.sketch_note.takeaway}</p>
+                              <p className="text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
+                                Takeaway
+                              </p>
+                              <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
+                                {chunk.result.sketch_note.takeaway}
+                              </p>
                             </div>
                           )}
                         </div>
@@ -748,27 +937,43 @@ export default function Home() {
               </RevealSection>
 
               <RevealSection className="mt-10">
-                <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">Concepts</p>
+                <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
+                  Concepts
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {result.knowledge_graph.nodes.map((node: any, i: number) => (
-                    <span key={i} className="graph-node">{node.label || node.name || node.id}</span>
+                    <span key={i} className="graph-node">
+                      {node.label || node.name || node.id}
+                    </span>
                   ))}
                 </div>
               </RevealSection>
 
               <RevealSection className="mt-12">
-                <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">Relationships</p>
+                <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
+                  Relationships
+                </p>
                 <div className="space-y-2">
                   {result.knowledge_graph.edges.map((edge: any, i: number) => {
-                    const from = result.knowledge_graph.nodes.find((n: any) => n.id === edge.from);
-                    const to = result.knowledge_graph.nodes.find((n: any) => n.id === edge.to);
+                    const from = result.knowledge_graph.nodes.find(
+                      (n: any) => n.id === edge.from
+                    );
+                    const to = result.knowledge_graph.nodes.find(
+                      (n: any) => n.id === edge.to
+                    );
                     return (
                       <div key={i} className="graph-edge">
-                        <span className="text-sm font-medium text-[var(--text-primary)]">{from?.label || edge.from}</span>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {from?.label || edge.from}
+                        </span>
                         <span className="text-[var(--accent)]">→</span>
-                        <span className="text-sm text-[var(--text-tertiary)]">{edge.relation}</span>
+                        <span className="text-sm text-[var(--text-tertiary)]">
+                          {edge.relation}
+                        </span>
                         <span className="text-[var(--mint)]">→</span>
-                        <span className="text-sm font-medium text-[var(--text-primary)]">{to?.label || edge.to}</span>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {to?.label || edge.to}
+                        </span>
                       </div>
                     );
                   })}
@@ -812,7 +1017,8 @@ export default function Home() {
                   Test Your Understanding
                 </h2>
                 <p className="mt-3 max-w-2xl text-base text-[var(--text-tertiary)]">
-                  Interactive quiz, concept timeline, and mind map to help you retain what you've learned.
+                  Interactive quiz, concept timeline, and mind map to help you
+                  retain what you've learned.
                 </p>
               </RevealSection>
 
@@ -820,8 +1026,12 @@ export default function Home() {
               {result.study_assets.quiz?.length > 0 && (
                 <RevealSection className="mt-12">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">Knowledge Check</p>
-                    <span className="text-xs text-[var(--text-muted)]">{result.study_assets.quiz.length} questions</span>
+                    <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
+                      Knowledge Check
+                    </p>
+                    <span className="text-xs text-[var(--text-muted)]">
+                      {result.study_assets.quiz.length} questions
+                    </span>
                   </div>
 
                   <div className="mt-6 space-y-12">
@@ -836,21 +1046,36 @@ export default function Home() {
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-xs font-medium text-[var(--accent)]">
                               {i + 1}
                             </span>
-                            <h4 className="text-base font-medium leading-relaxed text-[var(--text-primary)]">{q.question}</h4>
+                            <h4 className="text-base font-medium leading-relaxed text-[var(--text-primary)]">
+                              {q.question}
+                            </h4>
                           </div>
 
                           <div className="mt-5 space-y-2 pl-11">
                             {q.options.map((opt: string, oi: number) => {
                               const letter = opt.split(")")[0];
                               const isSelected = selected === letter;
-                              const showCorrect = checked && letter === q.correct;
-                              const showWrong = checked && isSelected && !isCorrect;
+                              const showCorrect =
+                                checked && letter === q.correct;
+                              const showWrong =
+                                checked && isSelected && !isCorrect;
 
                               return (
                                 <button
                                   key={oi}
-                                  onClick={() => setSelectedAnswers((p) => ({ ...p, [i]: letter }))}
-                                  className={`quiz-option ${isSelected && !checked ? "quiz-option--selected" : ""} ${showCorrect ? "quiz-option--correct" : ""} ${showWrong ? "quiz-option--wrong" : ""}`}
+                                  onClick={() =>
+                                    setSelectedAnswers((p) => ({
+                                      ...p,
+                                      [i]: letter,
+                                    }))
+                                  }
+                                  className={`quiz-option ${
+                                    isSelected && !checked
+                                      ? "quiz-option--selected"
+                                      : ""
+                                  } ${
+                                    showCorrect ? "quiz-option--correct" : ""
+                                  } ${showWrong ? "quiz-option--wrong" : ""}`}
                                   disabled={!!checked}
                                 >
                                   {opt}
@@ -863,7 +1088,12 @@ export default function Home() {
                             {!checked && (
                               <button
                                 disabled={!selected}
-                                onClick={() => setCheckedAnswers((p) => ({ ...p, [i]: true }))}
+                                onClick={() =>
+                                  setCheckedAnswers((p) => ({
+                                    ...p,
+                                    [i]: true,
+                                  }))
+                                }
                                 className="btn-press rounded-xl bg-[var(--accent-dim)] px-5 py-2.5 text-sm font-medium text-[var(--accent)] transition-all hover:bg-[var(--accent)]/20 disabled:cursor-not-allowed disabled:opacity-30"
                               >
                                 Check Answer
@@ -877,18 +1107,31 @@ export default function Home() {
                                   animate={{ opacity: 1, height: "auto" }}
                                   exit={{ opacity: 0, height: 0 }}
                                   className={`mt-4 overflow-hidden rounded-xl p-5 ${
-                                    isCorrect ? "bg-[var(--mint-dim)]" : "bg-red-500/[0.06]"
+                                    isCorrect
+                                      ? "bg-[var(--mint-dim)]"
+                                      : "bg-red-500/[0.06]"
                                   }`}
                                 >
-                                  <p className={`text-sm font-medium ${isCorrect ? "text-[var(--mint)]" : "text-red-300"}`}>
+                                  <p
+                                    className={`text-sm font-medium ${
+                                      isCorrect
+                                        ? "text-[var(--mint)]"
+                                        : "text-red-300"
+                                    }`}
+                                  >
                                     {isCorrect ? "✓ Correct!" : "✗ Not quite"}
                                   </p>
                                   {!isCorrect && (
                                     <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                                      Correct answer: <strong className="text-[var(--text-secondary)]">{q.correct}</strong>
+                                      Correct answer:{" "}
+                                      <strong className="text-[var(--text-secondary)]">
+                                        {q.correct}
+                                      </strong>
                                     </p>
                                   )}
-                                  <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">{q.explanation}</p>
+                                  <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
+                                    {q.explanation}
+                                  </p>
                                 </motion.div>
                               )}
                             </AnimatePresence>
@@ -899,7 +1142,10 @@ export default function Home() {
                   </div>
 
                   <button
-                    onClick={() => { setSelectedAnswers({}); setCheckedAnswers({}); }}
+                    onClick={() => {
+                      setSelectedAnswers({});
+                      setCheckedAnswers({});
+                    }}
                     className="btn-press mt-6 rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm text-[var(--text-tertiary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
                   >
                     Reset Quiz
@@ -910,18 +1156,31 @@ export default function Home() {
               {/* Timeline */}
               {result.study_assets.concept_timeline?.length > 0 && (
                 <RevealSection className="mt-20">
-                  <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">Concept Timeline</p>
+                  <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
+                    Concept Timeline
+                  </p>
                   <div className="space-y-0">
-                    {result.study_assets.concept_timeline.map((item: any, i: number) => (
-                      <div key={i} className="flex items-center gap-5 border-b border-[var(--border)] py-5 last:border-0">
-                        <span className="min-w-[60px] font-mono text-xs text-[var(--accent)]">{item.timestamp}s</span>
-                        <div className="h-px w-4 bg-[var(--border)]" />
-                        <div>
-                          <p className="font-serif text-lg text-[var(--text-primary)]">{item.concept}</p>
-                          <p className="mt-0.5 text-xs text-[var(--text-muted)]">Importance: {item.importance}</p>
+                    {result.study_assets.concept_timeline.map(
+                      (item: any, i: number) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-5 border-b border-[var(--border)] py-5 last:border-0"
+                        >
+                          <span className="min-w-[60px] font-mono text-xs text-[var(--accent)]">
+                            {item.timestamp}s
+                          </span>
+                          <div className="h-px w-4 bg-[var(--border)]" />
+                          <div>
+                            <p className="font-serif text-lg text-[var(--text-primary)]">
+                              {item.concept}
+                            </p>
+                            <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                              Importance: {item.importance}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      )
+                    )}
                   </div>
                 </RevealSection>
               )}
@@ -929,35 +1188,39 @@ export default function Home() {
               {/* Mind Map */}
               {result.study_assets.mind_map_text && (
                 <RevealSection className="mt-20">
-                  <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">Mind Map</p>
+                  <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
+                    Mind Map
+                  </p>
                   <div className="content-card p-6">
                     <div className="space-y-1.5">
-                      {result.study_assets.mind_map_text.split("\n").map((line: string, i: number) => {
-                        const trimmed = line.trim();
-                        if (!trimmed) return null;
-                        const spaces = line.length - line.trimStart().length;
-                        const level = Math.floor(spaces / 2);
-                        return (
-                          <div
-                            key={i}
-                            style={{ marginLeft: `${level * 24}px` }}
-                            className={`rounded-lg px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
-                              level === 0
-                                ? "font-serif text-lg text-[var(--text-primary)]"
-                                : level === 1
+                      {result.study_assets.mind_map_text
+                        .split("\n")
+                        .map((line: string, i: number) => {
+                          const trimmed = line.trim();
+                          if (!trimmed) return null;
+                          const spaces = line.length - line.trimStart().length;
+                          const level = Math.floor(spaces / 2);
+                          return (
+                            <div
+                              key={i}
+                              style={{ marginLeft: `${level * 24}px` }}
+                              className={`rounded-lg px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
+                                level === 0
+                                  ? "font-serif text-lg text-[var(--text-primary)]"
+                                  : level === 1
                                   ? "text-sm text-[var(--text-secondary)]"
                                   : "text-xs text-[var(--text-tertiary)]"
-                            }`}
-                          >
-                            {level > 0 && (
-                              <span className="mr-2 text-[var(--mint)]">
-                                {level === 1 ? "└" : "•"}
-                              </span>
-                            )}
-                            {trimmed}
-                          </div>
-                        );
-                      })}
+                              }`}
+                            >
+                              {level > 0 && (
+                                <span className="mr-2 text-[var(--mint)]">
+                                  {level === 1 ? "└" : "•"}
+                                </span>
+                              )}
+                              {trimmed}
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 </RevealSection>
@@ -981,7 +1244,9 @@ export default function Home() {
                       Ask about this video.
                     </h2>
                     <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-tertiary)]">
-                      Ask questions about the concepts explained in this video. MindBook retrieves relevant sections before generating the answer.
+                      Ask questions about the concepts explained in this video.
+                      MindBook retrieves relevant sections before generating the
+                      answer.
                     </p>
                   </div>
 
@@ -992,7 +1257,9 @@ export default function Home() {
                         placeholder="What do you want to know?"
                         value={question}
                         onChange={(e) => setQuestion(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === "Enter") handleAsk(); }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleAsk();
+                        }}
                         className="h-12 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-transparent px-5 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--mint)]/40"
                       />
                       <button
@@ -1005,11 +1272,17 @@ export default function Home() {
                             <span className="h-3 w-3 animate-spin rounded-full border-2 border-black/20 border-t-black" />
                             Thinking…
                           </span>
-                        ) : "Ask"}
+                        ) : (
+                          "Ask"
+                        )}
                       </button>
                     </div>
 
-                    {askError && <p className="animate-fade-in mt-4 text-xs text-red-300">{askError}</p>}
+                    {askError && (
+                      <p className="animate-fade-in mt-4 text-xs text-red-300">
+                        {askError}
+                      </p>
+                    )}
 
                     <AnimatePresence>
                       {answer && (
@@ -1019,8 +1292,12 @@ export default function Home() {
                           exit={{ opacity: 0, y: -8 }}
                           className="mt-8"
                         >
-                          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">Answer</p>
-                          <p className="whitespace-pre-line text-base leading-8 text-[var(--text-secondary)]">{answer}</p>
+                          <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
+                            Answer
+                          </p>
+                          <p className="whitespace-pre-line text-base leading-8 text-[var(--text-secondary)]">
+                            {answer}
+                          </p>
                         </motion.div>
                       )}
                     </AnimatePresence>
