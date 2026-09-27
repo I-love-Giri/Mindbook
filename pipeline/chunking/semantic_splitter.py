@@ -7,9 +7,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 
 class SemanticSplitter:
 
-    def __init__(
-        self, model_name="Qwen/Qwen3-Embedding-0.6B", threshold=0.55, min_words=50
-    ):
+    def __init__(self, model_name="all-MiniLM-L6-v2", threshold=0.55, min_words=50):
 
         device = "mps" if torch.backends.mps.is_available() else "cpu"
 

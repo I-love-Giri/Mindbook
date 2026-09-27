@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer
 
 class EmbeddingService:
 
-    def __init__(self, model_name="Qwen/Qwen3-Embedding-0.6B"):
+    def __init__(self, model_name="all-MiniLM-L6-v2"):
 
         device = "mps" if torch.backends.mps.is_available() else "cpu"
 
