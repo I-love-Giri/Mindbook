@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # ios/android substantially improves reliability.
 YDL_CLIENTS = ["ios", "android", "web"]
 
-_EMPTY_RESULT = {"title": "", "duration": 0.0, "chapters": []}
+_EMPTY_RESULT = {"title": "", "duration": 0.0, "thumbnail": "", "chapters": []}
 
 
 def _cookies_path() -> Optional[str]:
@@ -92,6 +92,6 @@ def extract_chapters_and_info(video_id: str) -> dict:
     return {
         "title": info.get("title", ""),
         "duration": float(info.get("duration") or 0),
+        "thumbnail": info.get("thumbnail", ""),
         "chapters": chapters,
     }
-
