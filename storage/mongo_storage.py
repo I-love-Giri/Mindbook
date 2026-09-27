@@ -1,3 +1,4 @@
+import os
 from pymongo import MongoClient
 from storage.base_storage import BaseStorage
 from video_processor.models.transcript import Segment, Transcript
@@ -6,7 +7,7 @@ from video_processor.models.transcript import Segment, Transcript
 class MongoStorage(BaseStorage):
     def __init__(
         self,
-        uri: str = "mongodb://localhost:27017/",
+        uri: str | None = None,
         database: str = "video_processor",
         collection: str = "transcripts",
         content_parse_collection: str = "content_parse",
@@ -15,6 +16,7 @@ class MongoStorage(BaseStorage):
         synthesis_collection: str = "synthesis",
         study_assets_collection: str = "study_assets",
     ):
+        uri = uri or os.getenv("MONGO_URI", "mongodb://localhost:27017/")
         self.client = MongoClient(uri)
         self.db = self.client[database]
         self.collection = self.db[collection]
