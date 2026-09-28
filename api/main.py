@@ -1,3 +1,20 @@
+print("=== DEBUG: checking transformers ===")
+
+try:
+    import torch
+    import transformers
+
+    print("DEBUG torch:", torch.__version__)
+    print("DEBUG transformers:", transformers.__version__)
+
+    from transformers import PreTrainedModel
+
+    print("DEBUG: PreTrainedModel import OK")
+
+except Exception as e:
+    print("DEBUG: PreTrainedModel import FAILED:", repr(e))
+
+
 import asyncio
 import json
 
