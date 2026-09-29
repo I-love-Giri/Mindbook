@@ -28,6 +28,7 @@ from storage.services.KG_Service import KGService
 from storage.services.deep_dive_service import DeepDiveService
 from storage.services.study_assets_service import StudyAssetsService
 from storage.services.synthesis_service import SynthesisService
+from storage.mongo_storage import MongoStorage
 
 from test_new_notes import run_pipeline
 from video_processor.services.parser import extract_video_id
@@ -133,6 +134,16 @@ def health_check():
         "status": "ok",
         "message": "MindBook API is running",
     }
+
+
+@app.get("/health/db")
+def health_db():
+    try:
+        db = MongoStorage()
+        db.client.admin.command("ping")
+        return {"status": "ok", "mongodb": "connected"}
+    except Exception as e:
+        return {"status": "error", "mongodb": str(e)}
 
 
 # --------------------------------------------------
