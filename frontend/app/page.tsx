@@ -73,6 +73,8 @@ const TABS: { id: Tab; label: string; description: string }[] = [
   { id: "ask", label: "Ask AI", description: "Ask anything" },
 ];
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
+
 // ============================================================
 //  SCROLL REVEAL HOOK
 // ============================================================
@@ -273,7 +275,7 @@ export default function Home() {
     setStageIndex(0);
     setPhase("processing");
     try {
-      const response = await fetch("http://127.0.0.1:8000/process/stream", {
+      const response = await fetch(`${API_URL}/process/stream`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
@@ -358,7 +360,7 @@ export default function Home() {
     setAnswer("");
     setAskError("");
     try {
-      const response = await fetch("http://127.0.0.1:8000/ask", {
+      const response = await fetch(`${API_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ video_id: videoId, question }),
