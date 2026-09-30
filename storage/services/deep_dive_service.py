@@ -21,6 +21,7 @@ class DeepDiveService:
         self,
         db: Optional[MongoStorage] = None,
         rag_index_service: Optional[RAGIndexService] = None,
+        embedding_model=None,
     ):
 
         self.cache = MemoryCache()
@@ -31,6 +32,8 @@ class DeepDiveService:
 
         self.llm_service = LLMService()
         self.rag_index_service = rag_index_service
+
+        self.embedding_model = embedding_model
 
     # --------------------------------------------------
     # Save complete L5 result for one video
@@ -137,6 +140,7 @@ class DeepDiveService:
             version=TranscriptChunker.VERSION_SEMANTIC,
             max_words=300,
             overlap_words=50,
+            embedding_model=self.embedding_model,
         )
 
         chunks = chunker.chunk(

@@ -9,6 +9,7 @@ import re
 from pipeline.cleaning.cleaner import TranscriptCleaner
 from video_processor.models.transcript import Segment
 from pipeline.chunking.semantic_splitter import SemanticSplitter
+from pipeline.embeddings.model import create_embedding_model
 
 
 class TranscriptChunker:
@@ -25,20 +26,20 @@ class TranscriptChunker:
         soft_limit_ratio: float = 0.75,
         pause_threshold: float = 2.0,
         min_chapter_duration: float = 60.0,
+        embedding_model=None,
     ):
-        self.semantic_splitter = SemanticSplitter()
+
+        if embedding_model is None:
+            embedding_model = create_embedding_model()
+
+        self.semantic_splitter = SemanticSplitter(model=embedding_model)
 
         self.version = version
-
         self.max_words = max_words
         self.overlap_words = overlap_words
-
         self.soft_limit = int(max_words * soft_limit_ratio)
-
         self.pause_threshold = pause_threshold
-
         self.min_chapter_duration = min_chapter_duration
-
         self.cleaner = TranscriptCleaner()
 
     def chunk(

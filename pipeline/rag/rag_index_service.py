@@ -6,8 +6,12 @@ from pipeline.vectorstore.qdrant_store import QdrantStore
 
 class RAGIndexService:
 
-    def __init__(self, store: QdrantStore):
-        self.embedding_service = EmbeddingService()
+    def __init__(
+        self,
+        store: QdrantStore,
+        embedding_model=None,
+    ):
+        self.embedding_service = EmbeddingService(model=embedding_model)
         self.store = store
 
     def index_chunks(self, chunks: List[Dict]) -> None:

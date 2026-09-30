@@ -9,15 +9,25 @@ from storage.services.deep_dive_service import DeepDiveService
 from storage.services.synthesis_service import SynthesisService
 from storage.services.study_assets_service import StudyAssetsService
 from pipeline.rag.rag_index_service import RAGIndexService
+from pipeline.embeddings.model import create_embedding_model
+from pipeline.vectorstore.qdrant_store import QdrantStore
 
 
 async def run_pipeline(video_id, qdrant_store):
-    rag_index_service = RAGIndexService(qdrant_store)
+    embedding_model = create_embedding_model()
+
+    rag_index_service = RAGIndexService(
+        qdrant_store,
+        embedding_model=embedding_model,
+    )
 
     services = [
         ContentParseService(),
         KGService(),
-        DeepDiveService(rag_index_service=rag_index_service),
+        DeepDiveService(
+            rag_index_service=rag_index_service,
+            embedding_model=embedding_model,
+        ),
         SynthesisService(),
         StudyAssetsService(),
     ]
@@ -87,8 +97,14 @@ def main():
     print(f"Video ID: {video_id}")
 
     try:
-        result = asyncio.run(run_pipeline(video_id))
+        qdrant_store = QdrantStore()
 
+        result = asyncio.run(
+            run_pipeline(
+                video_id,
+                qdrant_store,
+            )
+        )
         print("\n" + "=" * 80)
         print("PIPELINE COMPLETE")
         print("=" * 80)
@@ -126,6 +142,5 @@ def main():
         raise
 
 
-"""if __name__ == "__main__":
+if __name__ == "__main__":
     main()
-"""
