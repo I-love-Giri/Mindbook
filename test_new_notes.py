@@ -9,16 +9,13 @@ from storage.services.deep_dive_service import DeepDiveService
 from storage.services.synthesis_service import SynthesisService
 from storage.services.study_assets_service import StudyAssetsService
 from pipeline.rag.rag_index_service import RAGIndexService
-from pipeline.embeddings.model import create_embedding_model
 from pipeline.vectorstore.qdrant_store import QdrantStore
 
 
 async def run_pipeline(video_id, qdrant_store):
-    embedding_model = create_embedding_model()
 
     rag_index_service = RAGIndexService(
         qdrant_store,
-        embedding_model=embedding_model,
     )
 
     services = [
@@ -26,7 +23,6 @@ async def run_pipeline(video_id, qdrant_store):
         KGService(),
         DeepDiveService(
             rag_index_service=rag_index_service,
-            embedding_model=embedding_model,
         ),
         SynthesisService(),
         StudyAssetsService(),

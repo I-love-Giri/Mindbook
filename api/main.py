@@ -37,7 +37,6 @@ from pipeline.retrieval.retriever import Retriever
 from pipeline.rag.context_builder import ContextBuilder
 from pipeline.rag.generator import Generator
 from pipeline.rag.rag_index_service import RAGIndexService
-from pipeline.embeddings.model import create_embedding_model
 
 processing_status = {}
 
@@ -64,20 +63,8 @@ generator = Generator()
 # Embedding model and Retriever are created lazily.
 # This prevents the embedding model from loading when FastAPI starts.
 
-embedding_model = None
 embedding_service = None
 retriever = None
-
-
-def get_embedding_model():
-    global embedding_model
-
-    if embedding_model is None:
-        print("Loading shared embedding model...")
-        embedding_model = create_embedding_model()
-        print("Shared embedding model loaded.")
-
-    return embedding_model
 
 
 def get_retriever():
@@ -223,13 +210,10 @@ async def process_video_stream(request: VideoRequest):
             )
             content_service = ContentParseService()
             kg_service = KGService()
-            shared_model = await asyncio.to_thread(get_embedding_model)
             deep_dive_service = DeepDiveService(
                 rag_index_service=RAGIndexService(
                     vector_store,
-                    embedding_model=shared_model,
                 ),
-                embedding_model=shared_model,
             )
             synthesis_service = SynthesisService()
             study_assets_service = StudyAssetsService()
