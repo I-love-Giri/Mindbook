@@ -1,14 +1,11 @@
-import torch
-from sentence_transformers import SentenceTransformer
+from google import genai
+
+from config.settings import GEMINI_API_KEY
 
 
 def create_embedding_model(
-    model_name: str = "all-MiniLM-L6-v2",
-) -> SentenceTransformer:
-
-    device = "mps" if torch.backends.mps.is_available() else "cpu"
-
-    return SentenceTransformer(
-        model_name,
-        device=device,
+    model_name: str = "gemini-embedding-2",
+):
+    return genai.Client(
+        api_key=GEMINI_API_KEY,
     )

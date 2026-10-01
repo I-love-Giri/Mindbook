@@ -1,40 +1,35 @@
 from typing import List, Dict
 
-import torch
-from sentence_transformers import SentenceTransformer
+from google import genai
+
+from config.settings import GEMINI_API_KEY
 
 
 class EmbeddingService:
 
     def __init__(
         self,
-        model: SentenceTransformer | None = None,
-        model_name: str = "all-MiniLM-L6-v2",
+        model_name: str = "gemini-embedding-2",
     ):
-        if model is not None:
-            self.model = model
-        else:
-            device = "mps" if torch.backends.mps.is_available() else "cpu"
-            self.model = SentenceTransformer(model_name, device=device)
+        self.client = genai.Client(api_key=GEMINI_API_KEY)
+        self.model_name = model_name
 
     def embed_chunks(self, chunks: List[Dict]) -> List[List[float]]:
 
         texts = [chunk["text"] for chunk in chunks]
 
-        embeddings = self.model.encode(
-            texts,
-            batch_size=20,
-            normalize_embeddings=True,
-            show_progress_bar=True,
+        result = self.client.models.embed_content(
+            model=self.model_name,
+            contents=texts,
         )
 
-        return embeddings.tolist()
+        return [embedding.values for embedding in result.embeddings]
 
     def embed_query(self, query: str) -> List[float]:
 
-        embedding = self.model.encode(
-            query,
-            normalize_embeddings=True,
+        result = self.client.models.embed_content(
+            model=self.model_name,
+            contents=query,
         )
 
-        return embedding.tolist()
+        return result.embeddings[0].values

@@ -9,9 +9,8 @@ class RAGIndexService:
     def __init__(
         self,
         store: QdrantStore,
-        embedding_model=None,
     ):
-        self.embedding_service = EmbeddingService(model=embedding_model)
+        self.embedding_service = EmbeddingService()
         self.store = store
 
     def index_chunks(self, chunks: List[Dict]) -> None:

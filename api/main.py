@@ -1,10 +1,8 @@
 print("=== DEBUG: checking transformers ===")
 
 try:
-    import torch
     import transformers
 
-    print("DEBUG torch:", torch.__version__)
     print("DEBUG transformers:", transformers.__version__)
 
     from transformers import PreTrainedModel
@@ -88,7 +86,7 @@ def get_retriever():
     if retriever is None:
         print("Loading embedding model...")
 
-        embedding_service = EmbeddingService(model=get_embedding_model())
+        embedding_service = EmbeddingService()
 
         retriever = Retriever(
             embedding_service=embedding_service,

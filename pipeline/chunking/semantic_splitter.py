@@ -1,18 +1,20 @@
 from typing import List, Dict
 
-from sentence_transformers import SentenceTransformer
+from google import genai
 from sklearn.metrics.pairwise import cosine_similarity
+
+from config.settings import GEMINI_API_KEY
 
 
 class SemanticSplitter:
 
     def __init__(
         self,
-        model: SentenceTransformer,
+        model=None,
         threshold: float = 0.55,
         min_words: int = 50,
     ):
-        self.model = model
+        self.model = model or genai.Client(api_key=GEMINI_API_KEY)
         self.threshold = threshold
         self.min_words = min_words
 
@@ -23,11 +25,12 @@ class SemanticSplitter:
 
         texts = [x["text"] for x in sentences]
 
-        embeddings = self.model.encode(
-            texts,
-            batch_size=8,
-            normalize_embeddings=True,
+        result = self.model.models.embed_content(
+            model="gemini-embedding-2",
+            contents=texts,
         )
+
+        embeddings = [embedding.values for embedding in result.embeddings]
 
         groups = []
         current = []
