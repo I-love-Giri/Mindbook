@@ -1,3 +1,4 @@
+import os
 from typing import List, Dict
 import uuid
 
@@ -9,7 +10,11 @@ from qdrant_client.models import (
     Filter,
     FieldCondition,
     MatchValue,
+    PayloadSchemaType,
 )
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class QdrantStore:
@@ -25,17 +30,33 @@ class QdrantStore:
 
         # self.client = QdrantClient(host=host, port=port)
 
-        self.client = QdrantClient(path="./qdrant_data")
+        self.client = QdrantClient(
+            url=os.getenv("QDRANT_URL"),
+            api_key=os.getenv("QDRANT_API_KEY"),
+        )
 
     def create_collection(self, vector_size: int):
 
-        if self.client.collection_exists(self.collection_name):
-            return
+        if not self.client.collection_exists(self.collection_name):
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=VectorParams(
+                    size=vector_size,
+                    distance=Distance.COSINE,
+                ),
+            )
 
-        self.client.create_collection(
-            collection_name=self.collection_name,
-            vectors_config=VectorParams(size=vector_size, distance=Distance.COSINE),
-        )
+        # Create video_id index only if it doesn't already exist
+        collection_info = self.client.get_collection(self.collection_name)
+
+        payload_indexes = collection_info.payload_schema
+
+        if "video_id" not in payload_indexes:
+            self.client.create_payload_index(
+                collection_name=self.collection_name,
+                field_name="video_id",
+                field_schema=PayloadSchemaType.KEYWORD,
+            )
 
     def upsert(self, chunks: List[Dict], vectors: List[List[float]]):
 
