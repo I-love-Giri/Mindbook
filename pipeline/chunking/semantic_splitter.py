@@ -2,6 +2,7 @@ from typing import List, Dict
 
 from google import genai
 from sklearn.metrics.pairwise import cosine_similarity
+from google.genai import types
 
 from config.settings import GEMINI_API_KEY
 
@@ -25,12 +26,19 @@ class SemanticSplitter:
 
         texts = [x["text"] for x in sentences]
 
+        contents = [
+            types.Content(parts=[types.Part.from_text(text=text)]) for text in texts
+        ]
+
         result = self.model.models.embed_content(
             model="gemini-embedding-2",
-            contents=texts,
+            contents=contents,
         )
 
         embeddings = [embedding.values for embedding in result.embeddings]
+
+        print("DEBUG sentences:", len(sentences))
+        print("DEBUG embeddings:", len(embeddings))
 
         groups = []
         current = []

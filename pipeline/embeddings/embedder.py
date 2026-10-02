@@ -1,6 +1,7 @@
 from typing import List, Dict
 
 from google import genai
+from google.genai import types
 
 from config.settings import GEMINI_API_KEY
 
@@ -18,9 +19,13 @@ class EmbeddingService:
 
         texts = [chunk["text"] for chunk in chunks]
 
+        contents = [
+            types.Content(parts=[types.Part.from_text(text=text)]) for text in texts
+        ]
+
         result = self.client.models.embed_content(
             model=self.model_name,
-            contents=texts,
+            contents=contents,
         )
 
         return [embedding.values for embedding in result.embeddings]
