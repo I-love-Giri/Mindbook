@@ -1,4 +1,4 @@
-from youtube_transcript_api import IpBlocked, YouTubeTranscriptApi
+"""from youtube_transcript_api import IpBlocked, YouTubeTranscriptApi
 from youtube_transcript_api._errors import NoTranscriptFound
 from video_processor.models.transcript import Segment, Transcript
 import json
@@ -33,7 +33,7 @@ class YoutubeTranscriptService:
 
         fetched = transcript.fetch()
 
-        '''
+
         It's just a shorter way of writing:
 
         segments = []
@@ -44,12 +44,12 @@ class YoutubeTranscriptService:
                  "start": seg.start,
                  "duration": seg.duration,
             })
-        '''
+
 
         segments = [Segment( text = snippet.text,
                             start = snippet.start,
                              duration = snippet.duration )
-                    
+
                    for snippet in fetched ]
 
         return Transcript(language_code = transcript.language_code,
@@ -57,9 +57,46 @@ class YoutubeTranscriptService:
                           language = transcript.language,
                           segments = segments
                           )
+"""
 
-    
-'''
+from supadata import Supadata
+from video_processor.models.transcript import Segment, Transcript
+
+from config.settings import SUPADATA_API_KEY
+
+
+class YoutubeTranscriptService:
+
+    def fetch_transcript(self, video_id: str):
+
+        supadata = Supadata(api_key=SUPADATA_API_KEY)
+
+        try:
+            transcript = supadata.transcript(
+                url=f"https://www.youtube.com/watch?v={video_id}",
+                mode="auto",
+            )
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch transcript from Supadata: {e}")
+
+        segments = [
+            Segment(
+                text=chunk.text,
+                start=chunk.offset / 1000,
+                duration=chunk.duration / 1000,
+            )
+            for chunk in transcript.content
+        ]
+
+        return Transcript(
+            language_code=transcript.content[0].lang if transcript.content else "en",
+            video_id=video_id,
+            language=transcript.content[0].lang if transcript.content else "en",
+            segments=segments,
+        )
+
+
+"""
 
 User gives video_id
         │
@@ -136,4 +173,4 @@ fetch() returns FetchedTranscriptSnippet objects (with attributes like .text, .s
 with open(f"{video_id}_transcript.json", "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-'''
+"""

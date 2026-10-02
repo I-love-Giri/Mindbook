@@ -40,3 +40,5 @@ OPENROUTER_FAST_MODELS = [
     ).split(",")
     if model.strip()
 ]
+
+SUPADATA_API_KEY = os.getenv("SUPADATA_API_KEY")
