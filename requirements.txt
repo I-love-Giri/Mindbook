@@ -100,4 +100,4 @@ uvicorn==0.52.1
 websockets==16.1.1
 #youtube-transcript-api==1.2.4
 yt-dlp==2026.7.4
-supadata == 1.6.0
+supadata==1.6.0
