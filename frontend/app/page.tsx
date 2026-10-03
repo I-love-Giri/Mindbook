@@ -695,6 +695,23 @@ export default function Home() {
                 <span className="text-[var(--text-muted)]">/</span>
                 <span>Generated Study Space</span>
               </div>
+
+              <div className="mt-6 w-full max-w-4xl overflow-hidden rounded-2xl">
+                {result.content.thumbnail ? (
+                  <img
+                    src={result.content.thumbnail}
+                    alt={result.content.overall_topic}
+                    className="h-auto w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex aspect-video items-center justify-center bg-[var(--surface)]">
+                    <span className="text-[var(--text-muted)]">
+                      No thumbnail available
+                    </span>
+                  </div>
+                )}
+              </div>
+
               <h1 className="mt-6 font-serif text-4xl font-normal leading-tight tracking-[-0.02em] text-[var(--text-primary)] md:text-5xl lg:text-6xl">
                 {result.content.overall_topic}
               </h1>

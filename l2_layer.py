@@ -87,6 +87,8 @@ async def layer2_content_parse(
 
     result["knowledge_graph_mermaid"] = clean_mermaid(result["knowledge_graph_mermaid"])
 
+    result["thumbnail"] = video_info.get("thumbnail", "")
+
     return result
 
 
