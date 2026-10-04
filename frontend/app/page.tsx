@@ -1,53 +1,79 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+
 import { motion, AnimatePresence } from "framer-motion";
 
 // ============================================================
+
 //  TYPES
+
 // ============================================================
+
 type Phase = "idle" | "processing" | "done" | "failed";
 
 type DeepDiveBlock = {
   type: string;
+
   content: string;
+
   caption?: string;
+
   language?: string;
+
   variant?: string;
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
 type MindBookResult = any;
 
 type Tab = "executive" | "deep-dive" | "knowledge" | "guide" | "study" | "ask";
 
 // ============================================================
+
 //  STAGES
+
 // ============================================================
+
 const STAGES = [
   {
     label: "Parsing the video",
+
     detail: "Fetching the transcript and metadata",
+
     icon: "📡",
   },
+
   {
     label: "Mapping the knowledge graph",
+
     detail: "Extracting concepts and how they connect",
+
     icon: "🧠",
   },
+
   {
     label: "Writing the deep dive",
+
     detail: "Building chunk-by-chunk explanations",
+
     icon: "📝",
   },
+
   {
     label: "Synthesizing the guide",
+
     detail: "Writing the summary and FAQ",
+
     icon: "✨",
   },
+
   {
     label: "Building study assets",
+
     detail: "Generating the quiz, timeline and mind map",
+
     icon: "🎯",
   },
 ];
@@ -55,46 +81,67 @@ const STAGES = [
 const TABS: { id: Tab; label: string; description: string }[] = [
   {
     id: "executive",
+
     label: "Executive Summary",
+
     description: "The big picture",
   },
+
   { id: "deep-dive", label: "Deep Dive", description: "Detailed breakdowns" },
+
   {
     id: "knowledge",
+
     label: "Knowledge Graph",
+
     description: "Concepts & connections",
   },
+
   { id: "guide", label: "Complete Guide", description: "Full walkthrough" },
+
   {
     id: "study",
+
     label: "Study & Quiz",
+
     description: "Test your understanding",
   },
+
   { id: "ask", label: "Ask AI", description: "Ask anything" },
 ];
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
 // ============================================================
+
 //  SCROLL REVEAL HOOK
+
 // ============================================================
+
 function useReveal(threshold = 0.15) {
   const ref = useRef<HTMLDivElement>(null);
+
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const el = ref.current;
+
     if (!el) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
           setVisible(true);
+
           observer.disconnect();
         }
       },
+
       { threshold }
     );
+
     observer.observe(el);
+
     return () => observer.disconnect();
   }, [threshold]);
 
@@ -103,14 +150,19 @@ function useReveal(threshold = 0.15) {
 
 function RevealSection({
   children,
+
   className = "",
+
   stagger = false,
 }: {
   children: React.ReactNode;
+
   className?: string;
+
   stagger?: boolean;
 }) {
   const { ref, visible } = useReveal();
+
   return (
     <div
       ref={ref}
@@ -124,8 +176,11 @@ function RevealSection({
 }
 
 // ============================================================
+
 //  RICH BLOCK RENDERER (editorial style, no square boxes)
+
 // ============================================================
+
 function RichBlock({ block }: { block: DeepDiveBlock }) {
   if (block.type === "heading")
     return (
@@ -139,16 +194,18 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
 
   if (block.type === "code")
     return (
-      <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[#080808]">
+      <div className="w-full overflow-hidden rounded-xl border border-[var(--border)] bg-[#080808]">
         <div className="flex justify-between border-b border-[var(--border)] px-5 py-3 text-xs">
           <span className="text-[var(--accent)]">
             {block.caption || "Example"}
           </span>
+
           <span className="text-[var(--text-muted)]">
             {block.language || "text"}
           </span>
         </div>
-        <pre className="overflow-x-auto p-5 text-sm leading-7 text-[var(--text-secondary)]">
+
+        <pre className="overflow-x-auto p-4 text-sm leading-7 text-[var(--text-secondary)] sm:p-5">
           <code>{block.content}</code>
         </pre>
       </div>
@@ -157,15 +214,22 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
   if (block.type === "table") {
     const rows = String(block.content || "")
       .split("\n")
+
       .filter((row: string) => row.trim() && !/^\s*\|?\s*:?-+/.test(row));
+
     const cells = (row: string) =>
       row
+
         .split("|")
+
         .map((cell) => cell.trim())
+
         .filter(Boolean);
+
     const [head, ...body] = rows.map(cells);
+
     return (
-      <div className="overflow-x-auto rounded-xl border border-[var(--border)]">
+      <div className="w-full max-w-full overflow-x-auto rounded-xl border border-[var(--border)]">
         <table className="w-full min-w-[420px] text-left text-sm">
           <thead className="bg-white/[0.03] text-[var(--text-primary)]">
             <tr>
@@ -179,6 +243,7 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
               ))}
             </tr>
           </thead>
+
           <tbody className="text-[var(--text-secondary)]">
             {body.map((row: string[], rowIndex: number) => (
               <tr key={rowIndex}>
@@ -200,19 +265,21 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
 
   if (block.type === "ascii_diagram")
     return (
-      <pre className="overflow-x-auto rounded-xl border border-[var(--mint)]/15 bg-[var(--mint)]/[0.02] p-6 font-mono text-xs leading-7 text-[var(--mint)]">
+      <pre className="w-full max-w-full overflow-x-auto rounded-xl border border-[var(--mint)]/15 bg-[var(--mint)]/[0.02] p-4 font-mono text-xs leading-7 text-[var(--mint)] sm:p-6">
         {block.content}
       </pre>
     );
 
   if (block.type === "callout")
     return (
-      <div className="flex gap-4 rounded-xl bg-[var(--accent-dim)] px-6 py-5">
+      <div className="flex gap-3 rounded-xl bg-[var(--accent-dim)] px-4 py-4 sm:gap-4 sm:px-6 sm:py-5">
         <span className="mt-0.5 text-lg">💡</span>
+
         <div>
           <span className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)]">
             {block.variant || "note"}
           </span>
+
           <p className="mt-1 text-sm leading-7 text-[var(--text-secondary)]">
             {block.content}
           </p>
@@ -224,152 +291,236 @@ function RichBlock({ block }: { block: DeepDiveBlock }) {
 }
 
 // ============================================================
+
 //  MAIN COMPONENT
+
 // ============================================================
+
 export default function Home() {
   const [url, setUrl] = useState("");
+
   const [message, setMessage] = useState("");
+
   const [result, setResult] = useState<MindBookResult | null>(null);
+
   const [videoId, setVideoId] = useState("");
+
   const [question, setQuestion] = useState("");
+
   const [answer, setAnswer] = useState("");
+
   const [asking, setAsking] = useState(false);
+
   const [askError, setAskError] = useState("");
 
   const [phase, setPhase] = useState<Phase>("idle");
+
   const [stageIndex, setStageIndex] = useState(0);
+
   const [activeTab, setActiveTab] = useState<Tab>("executive");
 
   const [selectedAnswers, setSelectedAnswers] = useState<{
     [key: number]: string;
   }>({});
+
   const [checkedAnswers, setCheckedAnswers] = useState<{
     [key: number]: boolean;
   }>({});
 
   // hero typing effect
+
   const [heroReady, setHeroReady] = useState(false);
+
   useEffect(() => {
     const t = setTimeout(() => setHeroReady(true), 200);
+
     return () => clearTimeout(t);
   }, []);
 
   // scroll-aware nav blur
+
   const [scrolled, setScrolled] = useState(false);
+
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20);
+
     window.addEventListener("scroll", handler, { passive: true });
+
     return () => window.removeEventListener("scroll", handler);
   }, []);
 
   // ============================================================
+
   //  API HANDLERS (unchanged logic)
+
   // ============================================================
+
   const handleGenerate = useCallback(async () => {
     if (!url.trim()) {
       setMessage("Please enter a YouTube URL.");
+
       return;
     }
+
     setMessage("");
+
     setResult(null);
+
     setStageIndex(0);
+
     setPhase("processing");
+
     try {
       const response = await fetch(`${API_URL}/process/stream`, {
         method: "POST",
+
         headers: { "Content-Type": "application/json" },
+
         body: JSON.stringify({ url }),
       });
+
       if (!response.ok) throw new Error("Request failed");
+
       if (!response.body) throw new Error("Streaming is not available.");
+
       const reader = response.body.getReader();
+
       const decoder = new TextDecoder();
+
       let buffer = "";
+
       while (true) {
         const { done, value } = await reader.read();
+
         if (done) break;
+
         buffer += decoder.decode(value, { stream: true });
+
         const events = buffer.split("\n\n");
+
         buffer = events.pop() || "";
+
         for (const event of events) {
           const line = event
+
             .split("\n")
+
             .find((item) => item.startsWith("data: "));
+
           if (!line) continue;
+
           const eventData = JSON.parse(line.slice(6));
+
           if (eventData.message) setMessage(eventData.message);
+
           if (typeof eventData.stage === "number")
             setStageIndex(eventData.stage);
+
           if (eventData.type === "error") throw new Error(eventData.message);
+
           if (eventData.type === "content") {
             setResult({
               video_id: "",
+
               content: {
                 learning_objectives: [],
+
                 topics: [],
+
                 ...eventData.content,
               },
+
               knowledge_graph: { nodes: [], edges: [] },
+
               deep_dive: [],
+
               synthesis: { executive_summary: "", complete_guide: "", faq: [] },
+
               study_assets: {
                 quiz: [],
+
                 concept_timeline: [],
+
                 mind_map_text: "",
               },
             });
           }
+
           if (eventData.type === "knowledge_graph")
             setResult((c: MindBookResult | null) =>
               c ? { ...c, knowledge_graph: eventData.knowledge_graph } : c
             );
+
           if (eventData.type === "deep_dive_section")
             setResult((c: MindBookResult | null) => {
               if (!c) return c;
+
               const dd = [...(c?.deep_dive || [])];
+
               dd[eventData.section_index] = eventData.section;
+
               return { ...c, deep_dive: dd.filter(Boolean) };
             });
+
           if (eventData.type === "synthesis")
             setResult((c: MindBookResult | null) =>
               c ? { ...c, synthesis: eventData.synthesis } : c
             );
+
           if (eventData.type === "complete") {
             setVideoId(eventData.result.video_id);
+
             setResult(eventData.result);
+
             setStageIndex(STAGES.length - 1);
+
             setPhase("done");
           }
         }
       }
     } catch (error) {
       console.error(error);
+
       setResult(null);
+
       setMessage("Could not connect to FastAPI.");
+
       setPhase("failed");
     }
   }, [url]);
 
   const handleAsk = useCallback(async () => {
     if (!question.trim()) return;
+
     if (!videoId) {
       setAskError("Please generate a MindBook first.");
+
       return;
     }
+
     setAsking(true);
+
     setAnswer("");
+
     setAskError("");
+
     try {
       const response = await fetch(`${API_URL}/ask`, {
         method: "POST",
+
         headers: { "Content-Type": "application/json" },
+
         body: JSON.stringify({ video_id: videoId, question }),
       });
+
       if (!response.ok) throw new Error("Failed to get answer");
+
       const data = await response.json();
+
       setAnswer(data.answer);
     } catch (error) {
       console.error(error);
+
       setAskError("Could not get an answer.");
     } finally {
       setAsking(false);
@@ -378,19 +529,28 @@ export default function Home() {
 
   const goToTab = (id: Tab) => {
     setActiveTab(id);
+
     document
+
       .getElementById(id)
+
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   // ============================================================
+
   //  RENDER
+
   // ============================================================
+
   return (
     <main className="min-h-screen bg-[var(--bg)]">
       {/* ==============================================================
+
           NAV
-      ============================================================== */}
+
+      \============================================================== */}
+
       <motion.nav
         initial={{ y: -20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -401,15 +561,17 @@ export default function Home() {
             : "bg-transparent"
         }`}
       >
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--mint)] text-sm font-bold text-black">
               M
             </div>
+
             <span className="text-base font-medium tracking-tight text-[var(--text-primary)]">
               MindBook
             </span>
           </div>
+
           <div className="flex items-center gap-6">
             <span className="hidden items-center gap-2 text-xs text-[var(--text-muted)] md:flex">
               <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--mint)]" />
@@ -420,21 +582,30 @@ export default function Home() {
       </motion.nav>
 
       {/* ==============================================================
+
           HERO / LANDING
-      ============================================================== */}
+
+      \============================================================== */}
+
       {phase !== "done" && !result && (
         <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
           {/* Cinematic background */}
+
           <div className="hero-canvas">
             <div className="hero-orb hero-orb--1" />
+
             <div className="hero-orb hero-orb--2" />
+
             <div className="hero-orb hero-orb--3" />
+
             <div className="hero-grain" />
+
             <div className="hero-gradient-line" />
           </div>
 
-          <div className="relative z-10 mx-auto max-w-4xl px-6 text-center">
+          <div className="relative z-10 mx-auto max-w-4xl px-4 text-center sm:px-6">
             {/* Badge */}
+
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={heroReady ? { opacity: 1, y: 0 } : {}}
@@ -448,33 +619,39 @@ export default function Home() {
             </motion.div>
 
             {/* Headline */}
+
             <motion.h1
               initial={{ opacity: 0, y: 30 }}
               animate={heroReady ? { opacity: 1, y: 0 } : {}}
               transition={{
                 duration: 0.9,
+
                 delay: 0.1,
+
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="font-serif text-5xl font-normal leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] sm:text-6xl md:text-7xl lg:text-[5.5rem]"
+              className="font-serif text-4xl font-normal leading-[1.08] tracking-[-0.03em] text-[var(--text-primary)] sm:text-5xl md:text-7xl lg:text-[5.5rem]"
             >
               MindBook: Not a Summary,
               <br />
               <span className="bg-gradient-to-r from-[var(--accent)] to-[var(--mint)] bg-clip-text text-transparent">
-                Deep Intelligence.
+                Deeply.
               </span>
             </motion.h1>
 
             {/* Subtitle */}
+
             <motion.p
               initial={{ opacity: 0, y: 20 }}
               animate={heroReady ? { opacity: 1, y: 0 } : {}}
               transition={{
                 duration: 0.7,
+
                 delay: 0.25,
+
                 ease: [0.16, 1, 0.3, 1],
               }}
-              className="mx-auto mt-8 max-w-xl text-lg leading-relaxed text-[var(--text-tertiary)]"
+              className="mx-auto mt-6 max-w-xl text-base leading-relaxed text-[var(--text-tertiary)] sm:mt-8 sm:text-lg"
             >
               Paste a lecture, tutorial, or talk. MindBook transforms it into
               clear explanations, connected concepts, and study material you'll
@@ -482,18 +659,21 @@ export default function Home() {
             </motion.p>
 
             {/* Input or processing */}
+
             {phase === "idle" || phase === "failed" ? (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={heroReady ? { opacity: 1, y: 0 } : {}}
                 transition={{
                   duration: 0.7,
+
                   delay: 0.4,
+
                   ease: [0.16, 1, 0.3, 1],
                 }}
-                className="mx-auto mt-12 max-w-2xl"
+                className="mx-auto mt-8 w-full max-w-2xl sm:mt-12"
               >
-                <div className="flex overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-300 focus-within:border-[var(--accent)]/40 focus-within:shadow-[0_0_40px_rgba(196,160,255,0.06)]">
+                <div className="flex flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--bg-elevated)] transition-all duration-300 focus-within:border-[var(--accent)]/40 focus-within:shadow-[0_0_40px_rgba(196,160,255,0.06)] sm:flex-row">
                   <input
                     type="text"
                     placeholder="Paste a YouTube URL…"
@@ -502,11 +682,12 @@ export default function Home() {
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleGenerate();
                     }}
-                    className="h-14 min-w-0 flex-1 bg-transparent px-6 text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
+                    className="h-14 min-w-0 w-full flex-1 bg-transparent px-4 text-base text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] sm:px-6"
                   />
+
                   <button
                     onClick={handleGenerate}
-                    className="btn-press m-1.5 rounded-xl bg-gradient-to-r from-[var(--accent)] to-[#a78bfa] px-8 text-sm font-semibold text-black transition-all hover:shadow-[0_4px_20px_rgba(196,160,255,0.25)]"
+                    className="btn-press m-1.5 mt-0 rounded-xl bg-gradient-to-r from-[var(--accent)] to-[#a78bfa] px-8 py-3.5 text-sm font-semibold text-black transition-all hover:shadow-[0_4px_20px_rgba(196,160,255,0.25)] sm:mt-1.5"
                   >
                     Generate
                   </button>
@@ -520,24 +701,28 @@ export default function Home() {
               </motion.div>
             ) : (
               /* Processing state */
+
               <motion.div
                 initial={{ opacity: 0, y: 30 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.6 }}
                 className="mx-auto mt-12 max-w-lg"
               >
-                <div className="content-card p-8">
+                <div className="content-card p-5 sm:p-8">
                   <div className="flex items-center gap-3">
                     <span className="relative flex h-3 w-3">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--accent)]/50" />
+
                       <span className="relative inline-flex h-3 w-3 rounded-full bg-[var(--accent)]" />
                     </span>
+
                     <span className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                       Building your MindBook
                     </span>
                   </div>
 
                   {/* Progress */}
+
                   <div className="mt-6 h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
                     <motion.div
                       className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--mint)]"
@@ -552,7 +737,9 @@ export default function Home() {
                   <div className="mt-8 space-y-4">
                     {STAGES.map((stage, i) => {
                       const done = i < stageIndex;
+
                       const active = i === stageIndex;
+
                       return (
                         <div
                           key={stage.label}
@@ -587,6 +774,7 @@ export default function Home() {
                               <span>{stage.icon}</span>
                             )}
                           </div>
+
                           <div>
                             <p
                               className={`text-sm ${
@@ -599,6 +787,7 @@ export default function Home() {
                             >
                               {stage.label}
                             </p>
+
                             {active && (
                               <p className="animate-fade-in mt-0.5 text-xs text-[var(--text-tertiary)]">
                                 {stage.detail}
@@ -614,17 +803,22 @@ export default function Home() {
             )}
 
             {/* Feature pills */}
+
             <motion.div
               initial={{ opacity: 0 }}
               animate={heroReady ? { opacity: 1 } : {}}
               transition={{ duration: 1, delay: 0.6 }}
-              className="mx-auto mt-20 flex flex-wrap items-center justify-center gap-3"
+              className="mx-auto mt-14 flex flex-wrap items-center justify-center gap-2.5 px-2 sm:mt-20 sm:gap-3"
             >
               {[
                 "Executive summaries",
+
                 "Knowledge graphs",
+
                 "Deep dive explanations",
+
                 "Interactive quizzes",
+
                 "AI Q&A",
               ].map((f) => (
                 <span key={f} className="chip chip--ghost">
@@ -637,8 +831,11 @@ export default function Home() {
       )}
 
       {/* ==============================================================
+
           RESULT WORKSPACE
-      ============================================================== */}
+
+      \============================================================== */}
+
       {(phase === "done" || phase === "processing") && result && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -647,12 +844,14 @@ export default function Home() {
           className="mx-auto grid min-h-screen max-w-[1440px] grid-cols-1 pt-16 lg:grid-cols-[240px_minmax(0,1fr)]"
         >
           {/* ====== SIDEBAR ====== */}
+
           <aside className="hidden border-r border-[var(--border)] lg:block">
             <div className="sticky top-20 px-4 py-8">
               <div className="mb-8">
                 <p className="mb-4 px-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--text-muted)]">
                   Sections
                 </p>
+
                 <div className="space-y-1">
                   {TABS.map((tab) => (
                     <button
@@ -672,6 +871,7 @@ export default function Home() {
                 <p className="px-3 text-[10px] uppercase tracking-[0.2em] text-[var(--text-muted)]">
                   Status
                 </p>
+
                 <div className="mt-3 flex items-center gap-2 px-3 text-xs text-[var(--text-tertiary)]">
                   <span
                     className={`h-1.5 w-1.5 rounded-full ${
@@ -680,6 +880,7 @@ export default function Home() {
                         : "animate-pulse bg-[var(--accent)]"
                     }`}
                   />
+
                   {phase === "done" ? "MindBook ready" : message || "Building…"}
                 </div>
               </div>
@@ -687,12 +888,16 @@ export default function Home() {
           </aside>
 
           {/* ====== MAIN CONTENT ====== */}
-          <div className="min-w-0 px-6 py-8 md:px-10 lg:px-16 lg:py-12">
+
+          <div className="min-w-0 px-4 py-6 sm:px-6 sm:py-8 md:px-10 lg:px-16 lg:py-12">
             {/* ====== HERO HEADER ====== */}
+
             <RevealSection className="pb-12">
               <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
                 <span>MindBook</span>
+
                 <span className="text-[var(--text-muted)]">/</span>
+
                 <span>Generated Study Space</span>
               </div>
 
@@ -712,16 +917,19 @@ export default function Home() {
                 )}
               </div>
 
-              <h1 className="mt-6 font-serif text-4xl font-normal leading-tight tracking-[-0.02em] text-[var(--text-primary)] md:text-5xl lg:text-6xl">
+              <h1 className="mt-5 font-serif text-3xl font-normal leading-tight tracking-[-0.02em] text-[var(--text-primary)] sm:text-4xl md:text-5xl lg:text-6xl">
                 {result.content.overall_topic}
               </h1>
+
               <div className="mt-6 flex flex-wrap gap-2">
                 <span className="chip chip--accent">
                   {result.content.content_type}
                 </span>
+
                 <span className="chip chip--ghost">
                   {result.content.difficulty}
                 </span>
+
                 <span className="chip chip--ghost">
                   {result.content.domain}
                 </span>
@@ -729,8 +937,9 @@ export default function Home() {
             </RevealSection>
 
             {/* ====== TAB NAV ====== */}
-            <div className="sticky top-16 z-30 -mx-4 border-b border-[var(--border)] bg-black/90 px-4 backdrop-blur-xl">
-              <div className="flex gap-1 overflow-x-auto py-2">
+
+            <div className="sticky top-16 z-30 -mx-4 border-b border-[var(--border)] bg-black/90 px-4 backdrop-blur-xl sm:-mx-6 sm:px-6">
+              <div className="flex gap-1 overflow-x-auto py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {TABS.map((tab) => (
                   <button
                     key={tab.id}
@@ -742,6 +951,7 @@ export default function Home() {
                     }`}
                   >
                     {tab.label}
+
                     {activeTab === tab.id && (
                       <motion.span
                         layoutId="tab-indicator"
@@ -754,24 +964,30 @@ export default function Home() {
             </div>
 
             {/* ==============================================================
+
                 SECTION 1: EXECUTIVE SUMMARY
-            ============================================================== */}
-            <section id="executive" className="py-16">
+
+            \============================================================== */}
+
+            <section id="executive" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                   Executive Summary
                 </div>
-                <p className="max-w-3xl font-serif text-2xl leading-relaxed text-[var(--text-primary)] md:text-3xl md:leading-snug">
+
+                <p className="max-w-3xl font-serif text-xl leading-relaxed text-[var(--text-primary)] sm:text-2xl md:text-3xl md:leading-snug">
                   {result.synthesis.executive_summary}
                 </p>
               </RevealSection>
 
               {/* Learning Objectives */}
+
               {result.content.learning_objectives?.length > 0 && (
                 <RevealSection className="mt-16" stagger>
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                     What you'll learn
                   </p>
+
                   {result.content.learning_objectives.map(
                     (obj: string, i: number) => (
                       <div
@@ -781,6 +997,7 @@ export default function Home() {
                         <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-xs font-medium text-[var(--accent)]">
                           {i + 1}
                         </span>
+
                         <p className="text-base leading-relaxed text-[var(--text-secondary)]">
                           {obj}
                         </p>
@@ -791,17 +1008,20 @@ export default function Home() {
               )}
 
               {/* Topics */}
+
               {result.content.topics?.length > 0 && (
                 <RevealSection className="mt-16">
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                     Topics Covered
                   </p>
+
                   <div className="space-y-6">
                     {result.content.topics.map((topic: any, i: number) => (
                       <div key={i} className="group">
                         <h3 className="text-lg font-medium text-[var(--text-primary)] transition-colors group-hover:text-[var(--accent)]">
                           {topic.title}
                         </h3>
+
                         <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--text-tertiary)]">
                           {topic.summary}
                         </p>
@@ -812,17 +1032,20 @@ export default function Home() {
               )}
 
               {/* FAQ */}
+
               {result.synthesis.faq?.length > 0 && (
                 <RevealSection className="mt-16">
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                     Frequently Asked
                   </p>
+
                   <div className="space-y-8">
                     {result.synthesis.faq.map((item: any, i: number) => (
                       <div key={i}>
                         <h4 className="font-serif text-xl text-[var(--text-primary)]">
                           {item.q}
                         </h4>
+
                         <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-tertiary)]">
                           {item.a}
                         </p>
@@ -836,16 +1059,21 @@ export default function Home() {
             <div className="section-divider" />
 
             {/* ==============================================================
+
                 SECTION 2: DEEP DIVE
-            ============================================================== */}
-            <section id="deep-dive" className="py-16">
+
+            \============================================================== */}
+
+            <section id="deep-dive" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="mb-2 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                   Deep Dive
                 </div>
+
                 <h2 className="font-serif text-3xl text-[var(--text-primary)] md:text-4xl">
                   Detailed Breakdown
                 </h2>
+
                 <p className="mt-3 max-w-2xl text-base text-[var(--text-tertiary)]">
                   Each concept explained in depth, organized as a learning
                   journey.
@@ -856,11 +1084,13 @@ export default function Home() {
                 {result.deep_dive.map((chunk: any, i: number) => (
                   <RevealSection key={chunk.chunk_id ?? i}>
                     <article>
-                      <div className="flex items-center gap-4">
+                      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
                         <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-dim)] font-mono text-xs font-medium text-[var(--accent)]">
                           {String(i + 1).padStart(2, "0")}
                         </span>
+
                         <div className="h-px flex-1 bg-[var(--border)]" />
+
                         <span className="chip chip--accent">
                           Difficulty {chunk.result.difficulty_rating}/5
                         </span>
@@ -870,18 +1100,20 @@ export default function Home() {
                         Chunk {chunk.chunk_id}
                       </h3>
 
-                      <div className="mt-8 max-w-3xl space-y-8">
+                      <div className="mt-6 max-w-3xl space-y-8 sm:mt-8">
                         {chunk.result.blocks.map((block: any, bi: number) => (
                           <RichBlock key={bi} block={block} />
                         ))}
                       </div>
 
                       {/* Key concepts */}
+
                       {chunk.result.key_concepts?.length > 0 && (
                         <div className="mt-10">
                           <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                             Key Concepts
                           </p>
+
                           <div className="flex flex-wrap gap-2">
                             {chunk.result.key_concepts.map(
                               (c: string, ci: number) => (
@@ -895,17 +1127,21 @@ export default function Home() {
                       )}
 
                       {/* Sketch note */}
+
                       {chunk.result.sketch_note && (
                         <div className="mt-10 content-card p-6">
                           <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                             Visual Note
                           </p>
+
                           <h4 className="mt-2 font-serif text-xl text-[var(--text-primary)]">
                             {chunk.result.sketch_note.title}
                           </h4>
+
                           <p className="mt-1 text-xs text-[var(--text-muted)]">
                             {chunk.result.sketch_note.subtitle}
                           </p>
+
                           <ul className="mt-5 space-y-3">
                             {chunk.result.sketch_note.boxes?.map(
                               (box: string, bi: number) => (
@@ -914,16 +1150,19 @@ export default function Home() {
                                   className="flex gap-3 text-sm leading-relaxed text-[var(--text-secondary)]"
                                 >
                                   <span className="text-[var(--mint)]">—</span>
+
                                   <span>{box}</span>
                                 </li>
                               )
                             )}
                           </ul>
+
                           {chunk.result.sketch_note.takeaway && (
                             <div className="mt-6 border-t border-[var(--border)] pt-5">
                               <p className="text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
                                 Takeaway
                               </p>
+
                               <p className="mt-2 text-sm leading-7 text-[var(--text-secondary)]">
                                 {chunk.result.sketch_note.takeaway}
                               </p>
@@ -940,16 +1179,21 @@ export default function Home() {
             <div className="section-divider" />
 
             {/* ==============================================================
+
                 SECTION 3: KNOWLEDGE GRAPH
-            ============================================================== */}
-            <section id="knowledge" className="py-16">
+
+            \============================================================== */}
+
+            <section id="knowledge" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="mb-2 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                   Knowledge Graph
                 </div>
+
                 <h2 className="font-serif text-3xl text-[var(--text-primary)] md:text-4xl">
                   Concepts & Connections
                 </h2>
+
                 <p className="mt-3 max-w-2xl text-base text-[var(--text-tertiary)]">
                   How the ideas in this material relate to each other.
                 </p>
@@ -959,6 +1203,7 @@ export default function Home() {
                 <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
                   Concepts
                 </p>
+
                 <div className="flex flex-wrap gap-2">
                   {result.knowledge_graph.nodes.map((node: any, i: number) => (
                     <span key={i} className="graph-node">
@@ -972,24 +1217,34 @@ export default function Home() {
                 <p className="mb-4 text-xs font-medium uppercase tracking-widest text-[var(--text-muted)]">
                   Relationships
                 </p>
+
                 <div className="space-y-2">
                   {result.knowledge_graph.edges.map((edge: any, i: number) => {
                     const from = result.knowledge_graph.nodes.find(
                       (n: any) => n.id === edge.from
                     );
+
                     const to = result.knowledge_graph.nodes.find(
                       (n: any) => n.id === edge.to
                     );
+
                     return (
-                      <div key={i} className="graph-edge">
+                      <div
+                        key={i}
+                        className="graph-edge flex flex-wrap items-center gap-2"
+                      >
                         <span className="text-sm font-medium text-[var(--text-primary)]">
                           {from?.label || edge.from}
                         </span>
+
                         <span className="text-[var(--accent)]">→</span>
+
                         <span className="text-sm text-[var(--text-tertiary)]">
                           {edge.relation}
                         </span>
+
                         <span className="text-[var(--mint)]">→</span>
+
                         <span className="text-sm font-medium text-[var(--text-primary)]">
                           {to?.label || edge.to}
                         </span>
@@ -1003,13 +1258,17 @@ export default function Home() {
             <div className="section-divider" />
 
             {/* ==============================================================
+
                 SECTION 4: COMPLETE GUIDE
-            ============================================================== */}
-            <section id="guide" className="py-16">
+
+            \============================================================== */}
+
+            <section id="guide" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="mb-2 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                   Complete Guide
                 </div>
+
                 <h2 className="font-serif text-3xl text-[var(--text-primary)] md:text-4xl">
                   Full Walkthrough
                 </h2>
@@ -1025,16 +1284,21 @@ export default function Home() {
             <div className="section-divider" />
 
             {/* ==============================================================
+
                 SECTION 5: STUDY & QUIZ
-            ============================================================== */}
-            <section id="study" className="py-16">
+
+            \============================================================== */}
+
+            <section id="study" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="mb-2 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                   Study & Quiz
                 </div>
+
                 <h2 className="font-serif text-3xl text-[var(--text-primary)] md:text-4xl">
                   Test Your Understanding
                 </h2>
+
                 <p className="mt-3 max-w-2xl text-base text-[var(--text-tertiary)]">
                   Interactive quiz, concept timeline, and mind map to help you
                   retain what you've learned.
@@ -1042,12 +1306,14 @@ export default function Home() {
               </RevealSection>
 
               {/* Quiz */}
+
               {result.study_assets.quiz?.length > 0 && (
                 <RevealSection className="mt-12">
                   <div className="flex items-center justify-between">
                     <p className="text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                       Knowledge Check
                     </p>
+
                     <span className="text-xs text-[var(--text-muted)]">
                       {result.study_assets.quiz.length} questions
                     </span>
@@ -1056,26 +1322,32 @@ export default function Home() {
                   <div className="mt-6 space-y-12">
                     {result.study_assets.quiz.map((q: any, i: number) => {
                       const selected = selectedAnswers[i];
+
                       const checked = checkedAnswers[i];
+
                       const isCorrect = selected === q.correct;
 
                       return (
-                        <div key={i} className="content-card p-6">
-                          <div className="flex items-start gap-4">
+                        <div key={i} className="content-card p-4 sm:p-6">
+                          <div className="flex items-start gap-3 sm:gap-4">
                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--accent-dim)] text-xs font-medium text-[var(--accent)]">
                               {i + 1}
                             </span>
+
                             <h4 className="text-base font-medium leading-relaxed text-[var(--text-primary)]">
                               {q.question}
                             </h4>
                           </div>
 
-                          <div className="mt-5 space-y-2 pl-11">
+                          <div className="mt-5 space-y-2 pl-0 sm:pl-11">
                             {q.options.map((opt: string, oi: number) => {
                               const letter = opt.split(")")[0];
+
                               const isSelected = selected === letter;
+
                               const showCorrect =
                                 checked && letter === q.correct;
+
                               const showWrong =
                                 checked && isSelected && !isCorrect;
 
@@ -1085,6 +1357,7 @@ export default function Home() {
                                   onClick={() =>
                                     setSelectedAnswers((p) => ({
                                       ...p,
+
                                       [i]: letter,
                                     }))
                                   }
@@ -1103,13 +1376,14 @@ export default function Home() {
                             })}
                           </div>
 
-                          <div className="mt-4 pl-11">
+                          <div className="mt-4 pl-0 sm:pl-11">
                             {!checked && (
                               <button
                                 disabled={!selected}
                                 onClick={() =>
                                   setCheckedAnswers((p) => ({
                                     ...p,
+
                                     [i]: true,
                                   }))
                                 }
@@ -1140,6 +1414,7 @@ export default function Home() {
                                   >
                                     {isCorrect ? "✓ Correct!" : "✗ Not quite"}
                                   </p>
+
                                   {!isCorrect && (
                                     <p className="mt-1 text-xs text-[var(--text-tertiary)]">
                                       Correct answer:{" "}
@@ -1148,6 +1423,7 @@ export default function Home() {
                                       </strong>
                                     </p>
                                   )}
+
                                   <p className="mt-3 text-sm leading-7 text-[var(--text-secondary)]">
                                     {q.explanation}
                                   </p>
@@ -1163,6 +1439,7 @@ export default function Home() {
                   <button
                     onClick={() => {
                       setSelectedAnswers({});
+
                       setCheckedAnswers({});
                     }}
                     className="btn-press mt-6 rounded-xl border border-[var(--border)] px-5 py-2.5 text-sm text-[var(--text-tertiary)] hover:border-[var(--border-hover)] hover:text-[var(--text-primary)]"
@@ -1173,26 +1450,31 @@ export default function Home() {
               )}
 
               {/* Timeline */}
+
               {result.study_assets.concept_timeline?.length > 0 && (
                 <RevealSection className="mt-20">
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                     Concept Timeline
                   </p>
+
                   <div className="space-y-0">
                     {result.study_assets.concept_timeline.map(
                       (item: any, i: number) => (
                         <div
                           key={i}
-                          className="flex items-center gap-5 border-b border-[var(--border)] py-5 last:border-0"
+                          className="flex flex-col items-start gap-2 border-b border-[var(--border)] py-5 last:border-0 sm:flex-row sm:items-center sm:gap-5"
                         >
-                          <span className="min-w-[60px] font-mono text-xs text-[var(--accent)]">
+                          <span className="min-w-0 font-mono text-xs text-[var(--accent)] sm:min-w-[60px]">
                             {item.timestamp}s
                           </span>
+
                           <div className="h-px w-4 bg-[var(--border)]" />
+
                           <div>
                             <p className="font-serif text-lg text-[var(--text-primary)]">
                               {item.concept}
                             </p>
+
                             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
                               Importance: {item.importance}
                             </p>
@@ -1205,24 +1487,34 @@ export default function Home() {
               )}
 
               {/* Mind Map */}
+
               {result.study_assets.mind_map_text && (
                 <RevealSection className="mt-20">
                   <p className="mb-6 text-xs font-medium uppercase tracking-widest text-[var(--accent)]">
                     Mind Map
                   </p>
-                  <div className="content-card p-6">
+
+                  <div className="content-card p-4 sm:p-6">
                     <div className="space-y-1.5">
                       {result.study_assets.mind_map_text
+
                         .split("\n")
+
                         .map((line: string, i: number) => {
                           const trimmed = line.trim();
+
                           if (!trimmed) return null;
+
                           const spaces = line.length - line.trimStart().length;
+
                           const level = Math.floor(spaces / 2);
+
                           return (
                             <div
                               key={i}
-                              style={{ marginLeft: `${level * 24}px` }}
+                              style={{
+                                marginLeft: `${Math.min(level * 16, 64)}px`,
+                              }}
                               className={`rounded-lg px-4 py-2.5 transition-colors hover:bg-white/[0.03] ${
                                 level === 0
                                   ? "font-serif text-lg text-[var(--text-primary)]"
@@ -1236,6 +1528,7 @@ export default function Home() {
                                   {level === 1 ? "└" : "•"}
                                 </span>
                               )}
+
                               {trimmed}
                             </div>
                           );
@@ -1249,19 +1542,24 @@ export default function Home() {
             <div className="section-divider" />
 
             {/* ==============================================================
+
                 SECTION 6: ASK AI
-            ============================================================== */}
-            <section id="ask" className="py-16">
+
+            \============================================================== */}
+
+            <section id="ask" className="py-12 sm:py-16">
               <RevealSection>
                 <div className="content-card overflow-hidden">
-                  <div className="border-b border-[var(--border)] p-8">
+                  <div className="border-b border-[var(--border)] p-5 sm:p-8">
                     <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--mint)]" />
                       Ask AI
                     </div>
+
                     <h2 className="mt-3 font-serif text-3xl text-[var(--text-primary)] md:text-4xl">
                       Ask about this video.
                     </h2>
+
                     <p className="mt-3 max-w-xl text-sm leading-relaxed text-[var(--text-tertiary)]">
                       Ask questions about the concepts explained in this video.
                       MindBook retrieves relevant sections before generating the
@@ -1269,7 +1567,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <div className="p-8">
+                  <div className="p-5 sm:p-8">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input
                         type="text"
@@ -1281,6 +1579,7 @@ export default function Home() {
                         }}
                         className="h-12 min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-transparent px-5 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)] transition-colors focus:border-[var(--mint)]/40"
                       />
+
                       <button
                         onClick={handleAsk}
                         disabled={asking || !question.trim()}
@@ -1314,6 +1613,7 @@ export default function Home() {
                           <p className="mb-3 text-xs font-medium uppercase tracking-widest text-[var(--mint)]">
                             Answer
                           </p>
+
                           <p className="whitespace-pre-line text-base leading-8 text-[var(--text-secondary)]">
                             {answer}
                           </p>
@@ -1326,9 +1626,11 @@ export default function Home() {
             </section>
 
             {/* ====== FOOTER ====== */}
+
             <footer className="border-t border-[var(--border)] py-10">
-              <div className="flex flex-col justify-between gap-3 text-xs text-[var(--text-muted)] sm:flex-row">
+              <div className="flex flex-col justify-between gap-2 text-xs text-[var(--text-muted)] sm:flex-row sm:gap-3">
                 <span>MindBook</span>
+
                 <span>Understand · Connect · Remember</span>
               </div>
             </footer>
