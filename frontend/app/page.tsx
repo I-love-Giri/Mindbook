@@ -458,10 +458,10 @@ export default function Home() {
               }}
               className="font-serif text-5xl font-normal leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] sm:text-6xl md:text-7xl lg:text-[5.5rem]"
             >
-              Understand any video.
+              MindBook: Not a Summary,
               <br />
               <span className="bg-gradient-to-r from-[var(--accent)] to-[var(--mint)] bg-clip-text text-transparent">
-                Deeply.
+                Deep Intelligence.
               </span>
             </motion.h1>
 

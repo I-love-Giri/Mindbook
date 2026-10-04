@@ -4,7 +4,7 @@ import inspect
 
 from cache.memory_cache import MemoryCache
 from l5_layer import layer5_deep_dive
-from llm.groq_service import LLMService
+from llm.openrouter_service import OpenrouterService
 from pipeline.chunking.chunker import TranscriptChunker
 from pipeline.rag.rag_index_service import RAGIndexService
 from storage.mongo_storage import MongoStorage
@@ -15,7 +15,7 @@ from storage.services.transcript_service import TranscriptService
 class DeepDiveService:
 
     BATCH_SIZE = 1
-    REQUEST_GAP_SECONDS = 1.2
+    REQUEST_GAP_SECONDS = 1.5
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class DeepDiveService:
         self.transcript_service = TranscriptService(db=self.db)
         self.content_parse_service = ContentParseService(db=self.db)
 
-        self.llm_service = LLMService()
+        self.llm_service = OpenrouterService()
         self.rag_index_service = rag_index_service
 
         self.embedding_model = embedding_model

@@ -6,7 +6,7 @@ from features.deep_dive.l5_validator import normalize_deep_dive_result
 
 # from l2_layer import layer2_content_parse
 from l2_layer import layer2_content_parse
-from llm.groq_service import LLMService
+from llm.openrouter_service import OpenrouterService
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ async def layer5_deep_dive(
     chunks: List[Dict[str, Any]],
     video_info: Dict[str, Any],
     parsed: Dict[str, Any],
-    llm_service: LLMService,
+    llm_service: OpenrouterService,
 ) -> List[Dict[str, Any]]:
 
     if not chunks:
