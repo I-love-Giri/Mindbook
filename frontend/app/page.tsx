@@ -1277,9 +1277,9 @@ export default function Home() {
                       {result.study_assets.concept_timeline.map(
                         (item: any, i: number) => (
                           <div key={i} className="flex items-start gap-4">
-                            <span className="font-mono text-xs text-[var(--accent)] min-w-[50px]">
+                            {/*<span className="font-mono text-xs text-[var(--accent)] min-w-[50px]">
                               {item.timestamp}s
-                            </span>
+                            </span>*/}
                             <div>
                               <p className="text-sm font-medium text-[var(--text-primary)]">
                                 {item.concept}
