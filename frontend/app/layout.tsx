@@ -21,18 +21,22 @@ const instrumentSerif = Instrument_Serif({
 });
 
 export const metadata: Metadata = {
-  title: "MindBook — AI Learning Workspace",
+  title: "MindBook · Your learning workspace",
   description:
-    "Transform video lectures into structured knowledge. Executive summaries, deep dives, knowledge graphs, quizzes, and AI-powered Q&A.",
+    "Turn video lectures into structured editorial study guides designed for real comprehension and recall.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} ${instrumentSerif.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-black text-[#f5f5f5]">
+      <body className="min-h-full flex flex-col bg-[var(--bg)] text-[var(--text-primary)] font-sans">
         {children}
       </body>
     </html>
