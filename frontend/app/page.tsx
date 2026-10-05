@@ -228,6 +228,13 @@ export default function Home() {
     [key: number]: boolean;
   }>({});
 
+  // hero typing effect
+  const [heroReady, setHeroReady] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setHeroReady(true), 200);
+    return () => clearTimeout(t);
+  }, []);
+
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -490,12 +497,20 @@ export default function Home() {
 
             {/* Headline: Human, thoughtful, quiet */}
             <motion.h1
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.08 }}
-              className="font-serif text-4xl sm:text-5xl md:text-6xl font-normal leading-[1.12] tracking-[-0.02em] text-[var(--text-primary)]"
+              initial={{ opacity: 0, y: 30 }}
+              animate={heroReady ? { opacity: 1, y: 0 } : {}}
+              transition={{
+                duration: 0.9,
+                delay: 0.1,
+                ease: [0.16, 1, 0.3, 1],
+              }}
+              className="font-serif text-5xl font-normal leading-[1.05] tracking-[-0.03em] text-[var(--text-primary)] sm:text-6xl md:text-7xl lg:text-[5.5rem]"
             >
-              Turn a video into something you can actually learn from.
+              Not a Summary.
+              <br />
+              <span className="bg-gradient-to-r from-[var(--accent)] to-[var(--mint)] bg-clip-text text-transparent">
+                Deep Intelligence.
+              </span>
             </motion.h1>
 
             {/* Subtitle */}
@@ -515,71 +530,147 @@ export default function Home() {
               <motion.div
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: 0.24 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
                 className="mt-8 sm:mt-10"
               >
-                {/* Search Bar container */}
-                <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[#131416] p-1.5 transition-all duration-200 focus-within:border-[var(--accent-border)] focus-within:ring-1 focus-within:ring-[var(--accent-border)] shadow-sm">
-                  <div className="pl-3 text-[var(--text-muted)]">
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                      <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                    </svg>
-                  </div>
+                {/* Input */}
+                <div className="group relative">
+                  {/* Focus glow */}
+                  <div className="pointer-events-none absolute -inset-[1px] rounded-2xl bg-gradient-to-r from-white/[0.08] via-white/[0.02] to-white/[0.08] opacity-0 blur-sm transition-opacity duration-300 group-focus-within:opacity-100" />
 
-                  <input
-                    type="text"
-                    placeholder="Paste a YouTube link (e.g. youtube.com/watch?v=...)"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") handleGenerate();
-                    }}
-                    className="h-11 w-full bg-transparent px-2 text-sm text-[var(--text-primary)] outline-none placeholder:text-[var(--text-muted)]"
-                  />
-
-                  <button
-                    onClick={() => handleGenerate()}
-                    className="btn-press shrink-0 rounded-lg bg-[var(--text-primary)] px-4 py-2.5 text-xs font-medium text-zinc-900 transition-colors hover:bg-white"
+                  <div
+                    className="
+          relative flex items-center gap-2
+          rounded-2xl
+          border border-white/[0.08]
+          bg-white/[0.035]
+          p-1.5
+          shadow-[0_8px_30px_rgba(0,0,0,0.18)]
+          backdrop-blur-xl
+          transition-all duration-300
+          group-focus-within:border-white/[0.14]
+          group-focus-within:bg-white/[0.045]
+        "
                   >
-                    Generate guide
-                  </button>
+                    {/* Link icon */}
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center text-zinc-500 transition-colors duration-200 group-focus-within:text-zinc-300">
+                      <svg
+                        className="h-[17px] w-[17px]"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                      >
+                        <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                        <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                      </svg>
+                    </div>
+
+                    {/* Input */}
+                    <input
+                      type="text"
+                      placeholder="Paste a YouTube link..."
+                      value={url}
+                      onChange={(e) => setUrl(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleGenerate();
+                      }}
+                      className="
+            h-11 min-w-0 flex-1
+            bg-transparent
+            px-1
+            text-sm
+            text-[var(--text-primary)]
+            outline-none
+            placeholder:text-zinc-600
+          "
+                    />
+
+                    {/* Generate button */}
+                    <button
+                      onClick={() => handleGenerate()}
+                      className="
+    btn-press
+    flex h-11 shrink-0 items-center gap-2
+    rounded-xl
+    bg-white
+    px-4 sm:px-5
+    text-xs font-semibold
+    text-zinc-950
+    shadow-sm
+    transition-all duration-200
+    hover:bg-zinc-100
+    hover:shadow-[0_4px_18px_rgba(255,255,255,0.08)]
+    active:scale-[0.98]
+  "
+                    >
+                      <span>Generate</span>
+
+                      <svg
+                        className="h-3.5 w-3.5"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                      >
+                        <path
+                          d="M3 8h9M8.5 4.5L12 8l-3.5 3.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
 
+                {/* Status / Error message */}
                 {message && (
-                  <p
-                    className={`mt-3 text-xs ${
+                  <motion.p
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`mt-3 px-1 text-xs ${
                       phase === "failed"
                         ? "text-[var(--error)]"
                         : "text-[var(--text-tertiary)]"
                     }`}
                   >
                     {message}
-                  </p>
+                  </motion.p>
                 )}
 
-                {/* Example sample links */}
-                <div className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-xs text-[var(--text-muted)]">
-                  <span>Try an example:</span>
-                  {sampleVideos.map((sample) => (
-                    <button
-                      key={sample.title}
-                      onClick={() => {
-                        setUrl(sample.url);
-                        handleGenerate(sample.url);
-                      }}
-                      className="text-[var(--text-tertiary)] underline decoration-[var(--border)] underline-offset-4 hover:text-[var(--text-primary)] hover:decoration-[var(--text-secondary)] transition-colors"
-                    >
-                      {sample.title}
-                    </button>
-                  ))}
-                </div>
+                {/* Example links */}
+                {!message && (
+                  <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
+                    <span className="mr-1 text-[11px] text-zinc-600">
+                      Try an example
+                    </span>
+
+                    {sampleVideos.map((sample) => (
+                      <button
+                        key={sample.title}
+                        onClick={() => {
+                          setUrl(sample.url);
+                          handleGenerate(sample.url);
+                        }}
+                        className="
+              rounded-full
+              border border-white/[0.07]
+              bg-white/[0.025]
+              px-3 py-1.5
+              text-[11px]
+              text-zinc-500
+              transition-all duration-200
+              hover:border-white/[0.14]
+              hover:bg-white/[0.06]
+              hover:text-zinc-200
+              active:scale-95
+            "
+                      >
+                        {sample.title}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </motion.div>
             ) : (
               /* ==============================================================

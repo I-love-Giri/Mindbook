@@ -13,11 +13,16 @@
   --text-muted: #52525b;
 
   /* Single restrained editorial accent (warm iris) */
-  --accent: #7c6eed;
-  --accent-dim: rgba(124, 110, 237, 0.12);
+
   --accent-subtle: rgba(124, 110, 237, 0.05);
   --accent-border: rgba(124, 110, 237, 0.26);
   --accent-hover: #8f83f0;
+
+  --accent: #c4a0ff;
+  --accent-dim: rgba(196, 160, 255, 0.12);
+  --accent-glow: rgba(196, 160, 255, 0.06);
+  --mint: #6ee7b7;
+  --mint-dim: rgba(110, 231, 183, 0.12);
 
   --success: #34d399;
   --success-dim: rgba(52, 211, 153, 0.12);
@@ -80,11 +85,12 @@ body {
 
 /* ========================================
    FOCUS
-======================================== */
-:focus-visible {
+
+   :focus-visible {
   outline: 1.5px solid var(--accent);
   outline-offset: 2px;
 }
+======================================== */
 
 /* ========================================
    QUIET HERO BACKGROUND
