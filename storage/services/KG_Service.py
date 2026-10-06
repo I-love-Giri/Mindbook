@@ -68,7 +68,10 @@ class KGService:
             return None
 
         # 4. L2 layer
-        layer2_result = await self.content_parse_service.get(video_id)
+        layer2_result = await self.content_parse_service.get(
+            video_id,
+            transcript=transcript,
+        )
 
         if layer2_result is None:
             return None

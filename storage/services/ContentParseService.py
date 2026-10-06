@@ -35,30 +35,25 @@ class ContentParseService:
     async def get(
         self,
         video_id: str,
+        transcript=None,
     ) -> dict | None:
 
         # 1. Cache
         result = self.cache.get(video_id)
 
         if result is not None:
-            print("Cache Hit")
             return result
 
         # 2. Database
         result = self.db.get_content_parse(video_id)
 
         if result is not None:
-            print("Loaded from DB")
-
-            self.cache.set(
-                video_id,
-                result,
-            )
-
+            self.cache.set(video_id, result)
             return result
 
         # 3. Transcript
-        transcript = self.transcript_service.get(video_id)
+        if transcript is None:
+            transcript = self.transcript_service.get(video_id)
 
         if transcript is None:
             return None
@@ -70,13 +65,10 @@ class ContentParseService:
             llm_service=self.llm_service,
         )
 
-        # 5. Save L2 result
+        # 5. Save
         self.save(
             video_id=video_id,
             result=layer2_result,
         )
 
         return layer2_result
-
-    def close(self):
-        self.db.close()
