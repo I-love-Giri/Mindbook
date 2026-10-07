@@ -4,6 +4,10 @@ import { useState } from "react";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8000";
 
+// ============================================================
+// TYPES
+// ============================================================
+
 type DeepDiveBlock = {
   type: string;
   content: string;
@@ -17,7 +21,7 @@ type DeepDiveChapter = {
   result?: {
     blocks?: DeepDiveBlock[];
     key_concepts?: string[];
-    difficulty_rating?: number;
+    difficulty_rating?: string;
   };
 };
 
@@ -39,38 +43,46 @@ type MindBookResult = {
   deep_dive?: DeepDiveChapter[];
 };
 
-export default function Home() {
-  // -----------------------------
-  // Basic frontend state
-  // -----------------------------
+// ============================================================
+// PROGRESS STAGES
+// ============================================================
 
+const PROGRESS_STAGES = [
+  "Fetching transcript",
+  "Parsing content",
+  "Creating deep dive summaries",
+  "Finalizing results",
+];
+
+// ============================================================
+// MAIN COMPONENT
+// ============================================================
+
+export default function Home() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<MindBookResult | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
 
-  // RAG state
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [asking, setAsking] = useState(false);
   const [askError, setAskError] = useState("");
 
-  // -----------------------------
-  // Generate MindBook
-  // -----------------------------
+  // ----------------------------------------------------------
+  // GENERATE MINDBOOK
+  // ----------------------------------------------------------
 
-  async function handleGenerate() {
+  const handleGenerate = async () => {
     if (!url.trim()) {
       setMessage("Please enter a YouTube URL.");
       return;
     }
 
     setLoading(true);
-    setMessage("Processing video...");
     setResult(null);
-    setAnswer("");
-    setAskError("");
+    setMessage("Starting...");
 
     try {
       const response = await fetch(`${API_URL}/process/stream`, {
@@ -88,7 +100,7 @@ export default function Home() {
       }
 
       if (!response.body) {
-        throw new Error("Streaming is not available.");
+        throw new Error("Streaming is not supported.");
       }
 
       const reader = response.body.getReader();
@@ -97,7 +109,7 @@ export default function Home() {
       let buffer = "";
 
       while (true) {
-        const { done, value } = await reader.read();
+        const { value, done } = await reader.read();
 
         if (done) break;
 
@@ -110,27 +122,39 @@ export default function Home() {
         buffer = events.pop() || "";
 
         for (const event of events) {
-          const line = event
-            .split("\n")
-            .find((line) => line.startsWith("data: "));
+          const lines = event.split("\n");
 
-          if (!line) continue;
+          for (const line of lines) {
+            if (!line.startsWith("data:")) {
+              continue;
+            }
 
-          const data = JSON.parse(line.slice(6));
+            const rawData = line.slice(5).trim();
 
-          // Show backend progress message
-          if (data.message) {
-            setMessage(data.message);
-          }
+            if (!rawData) {
+              continue;
+            }
 
-          // Backend finished everything
-          if (data.type === "complete") {
-            setResult(data.result);
-            setMessage("Done!");
-          }
+            try {
+              const data = JSON.parse(rawData);
 
-          if (data.type === "error") {
-            throw new Error(data.message || "Processing failed.");
+              // Backend progress message
+              if (data.message) {
+                setMessage(data.message);
+              }
+
+              // Final result
+              if (data.type === "complete") {
+                setResult(data.result);
+                setMessage("Complete!");
+              }
+
+              if (data.type === "error") {
+                throw new Error(data.message || "Something went wrong.");
+              }
+            } catch (error) {
+              console.error("SSE parsing error:", error);
+            }
           }
         }
       }
@@ -143,23 +167,20 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
-  }
+  };
 
-  // -----------------------------
-  // Ask RAG question
-  // -----------------------------
+  // ----------------------------------------------------------
+  // ASK RAG
+  // ----------------------------------------------------------
 
-  async function handleAsk() {
-    if (!question.trim()) return;
-
-    if (!result?.video_id) {
-      setAskError("Please generate a MindBook first.");
+  const handleAsk = async () => {
+    if (!question.trim() || !result?.video_id) {
       return;
     }
 
     setAsking(true);
-    setAnswer("");
     setAskError("");
+    setAnswer("");
 
     try {
       const response = await fetch(`${API_URL}/ask`, {
@@ -173,55 +194,89 @@ export default function Home() {
         }),
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to get answer.");
-      }
-
       const data = await response.json();
 
-      setAnswer(data.answer);
-    } catch (error) {
-      console.error(error);
+      if (!response.ok) {
+        throw new Error(data.detail || "Failed to get answer.");
+      }
 
+      setAnswer(data.answer || "");
+    } catch (error) {
       setAskError(
-        error instanceof Error ? error.message : "Could not get an answer."
+        error instanceof Error ? error.message : "Something went wrong."
       );
     } finally {
       setAsking(false);
     }
-  }
+  };
 
-  // -----------------------------
-  // Reset
-  // -----------------------------
+  // ----------------------------------------------------------
+  // RESET
+  // ----------------------------------------------------------
 
-  function handleReset() {
+  const handleReset = () => {
     setUrl("");
     setResult(null);
     setMessage("");
     setQuestion("");
     setAnswer("");
     setAskError("");
-  }
+  };
 
-  // -----------------------------
+  // ----------------------------------------------------------
+  // GET CURRENT PROGRESS
+  // ----------------------------------------------------------
+
+  const getProgressIndex = () => {
+    const text = message.toLowerCase();
+
+    if (text.includes("transcript") || text.includes("fetch")) {
+      return 0;
+    }
+
+    if (text.includes("parse") || text.includes("content")) {
+      return 1;
+    }
+
+    if (
+      text.includes("deep") ||
+      text.includes("summary") ||
+      text.includes("chunk")
+    ) {
+      return 2;
+    }
+
+    if (
+      text.includes("synth") ||
+      text.includes("final") ||
+      text.includes("complete")
+    ) {
+      return 3;
+    }
+
+    return 0;
+  };
+
+  const progressIndex = getProgressIndex();
+
+  // ============================================================
   // UI
-  // -----------------------------
+  // ============================================================
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-zinc-100">
-      {/* --------------------------------
-          Header
-      -------------------------------- */}
+    <main className="min-h-screen bg-gray-50 text-gray-900">
+      {/* ======================================================
+          HEADER
+      ====================================================== */}
 
-      <header className="border-b border-zinc-800">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-4">
-          <h1 className="text-xl font-semibold">MindBook</h1>
+      <header className="border-b bg-white">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+          <h1 className="text-xl font-bold">MindBook</h1>
 
           {result && (
             <button
               onClick={handleReset}
-              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              className="rounded-lg border px-4 py-2 text-sm hover:bg-gray-100"
             >
               New Video
             </button>
@@ -229,19 +284,19 @@ export default function Home() {
         </div>
       </header>
 
-      {/* --------------------------------
-          Input
-      -------------------------------- */}
+      {/* ======================================================
+          INPUT PAGE
+      ====================================================== */}
 
-      {!result && (
-        <section className="mx-auto max-w-3xl px-5 py-24">
+      {!result && !loading && (
+        <section className="mx-auto max-w-3xl px-6 py-20">
           <div className="text-center">
             <h2 className="text-4xl font-bold">
-              Turn a YouTube video into a MindBook
+              Turn YouTube videos into MindBooks
             </h2>
 
-            <p className="mt-4 text-zinc-400">
-              Get a concise overview, chapter-by-chapter deep dive, and ask
+            <p className="mt-4 text-gray-600">
+              Generate a concise overview, deep dive summaries, and ask
               questions using RAG.
             </p>
           </div>
@@ -251,98 +306,147 @@ export default function Home() {
               type="text"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              placeholder="Paste YouTube URL..."
+              className="flex-1 rounded-xl border bg-white px-4 py-3 outline-none focus:border-black"
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
                   handleGenerate();
                 }
               }}
-              placeholder="Paste YouTube URL..."
-              className="h-12 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 outline-none placeholder:text-zinc-500 focus:border-zinc-500"
             />
 
             <button
               onClick={handleGenerate}
-              disabled={loading}
-              className="h-12 rounded-lg bg-white px-6 font-medium text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-black px-6 py-3 font-medium text-white hover:bg-gray-800"
             >
-              {loading ? "Processing..." : "Generate"}
+              Generate
             </button>
           </div>
-
-          {message && (
-            <p className="mt-4 text-center text-sm text-zinc-400">{message}</p>
-          )}
         </section>
       )}
 
-      {/* --------------------------------
-          Result
-      -------------------------------- */}
+      {/* ======================================================
+          PROGRESS
+      ====================================================== */}
+
+      {loading && (
+        <section className="mx-auto max-w-2xl px-6 py-20">
+          <div className="rounded-2xl border bg-white p-8 shadow-sm">
+            <div className="text-center">
+              <div className="mx-auto mb-5 h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-black" />
+
+              <h2 className="text-2xl font-bold">Generating your MindBook</h2>
+
+              <p className="mt-2 text-sm text-gray-500">
+                {message || "Processing your video..."}
+              </p>
+            </div>
+
+            {/* Progress stages */}
+
+            <div className="mt-8 space-y-4">
+              {PROGRESS_STAGES.map((stage, index) => {
+                const completed = index < progressIndex;
+
+                const current = index === progressIndex;
+
+                return (
+                  <div key={stage} className="flex items-center gap-3">
+                    {/* Status icon */}
+
+                    <div
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-medium ${
+                        completed
+                          ? "bg-black text-white"
+                          : current
+                          ? "border-2 border-black"
+                          : "border border-gray-300 text-gray-400"
+                      }`}
+                    >
+                      {completed ? "✓" : index + 1}
+                    </div>
+
+                    {/* Stage name */}
+
+                    <span
+                      className={
+                        completed
+                          ? "text-sm text-gray-900"
+                          : current
+                          ? "text-sm font-medium text-gray-900"
+                          : "text-sm text-gray-400"
+                      }
+                    >
+                      {stage}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ======================================================
+          RESULT
+      ====================================================== */}
 
       {result && (
-        <div className="mx-auto max-w-4xl px-5 py-10">
-          {/* --------------------------------
-              Title + Thumbnail
-          -------------------------------- */}
+        <section className="mx-auto max-w-4xl px-6 py-10">
+          {/* --------------------------------------------------
+              TITLE
+          -------------------------------------------------- */}
 
-          <section>
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              {result.content?.overall_topic || "Untitled Video"}
-            </h2>
+          <h2 className="text-3xl font-bold">
+            {result.content?.overall_topic || "MindBook"}
+          </h2>
 
-            {result.content?.thumbnail && (
-              <img
-                src={result.content.thumbnail}
-                alt={result.content.overall_topic || "Video"}
-                className="mt-6 w-full rounded-xl object-cover"
-              />
-            )}
-          </section>
+          {/* --------------------------------------------------
+              THUMBNAIL
+          -------------------------------------------------- */}
 
-          {/* --------------------------------
-              Overview
-          -------------------------------- */}
+          {result.content?.thumbnail && (
+            <img
+              src={result.content.thumbnail}
+              alt={result.content.overall_topic || "Video thumbnail"}
+              className="mt-6 w-full rounded-2xl object-cover"
+            />
+          )}
 
-          <section className="mt-12 border-t border-zinc-800 pt-10">
-            <h3 className="text-2xl font-semibold">Overview</h3>
+          {/* --------------------------------------------------
+              OVERVIEW
+          -------------------------------------------------- */}
 
-            <p className="mt-4 whitespace-pre-line text-base leading-8 text-zinc-300">
+          <section className="mt-8 rounded-2xl border bg-white p-6">
+            <h3 className="text-xl font-semibold">Overview</h3>
+
+            <p className="mt-4 whitespace-pre-line leading-7 text-gray-700">
               {result.synthesis?.executive_summary || "No overview available."}
             </p>
           </section>
 
-          {/* --------------------------------
-              Deep Dive
-          -------------------------------- */}
+          {/* --------------------------------------------------
+              DEEP DIVE
+          -------------------------------------------------- */}
 
-          <section className="mt-12 border-t border-zinc-800 pt-10">
-            <h3 className="text-2xl font-semibold">Deep Dive</h3>
+          <section className="mt-10">
+            <h3 className="text-2xl font-bold">Deep Dive</h3>
 
-            <p className="mt-2 text-sm text-zinc-500">
-              Chapter-by-chapter explanation.
+            <p className="mt-2 text-gray-600">
+              Chapter-by-chapter explanations.
             </p>
 
-            <div className="mt-10 space-y-12">
+            <div className="mt-6 space-y-6">
               {result.deep_dive?.map((chapter, index) => (
                 <article
                   key={chapter.chunk_id || index}
-                  className="border-t border-zinc-800 pt-8 first:border-t-0 first:pt-0"
+                  className="rounded-2xl border bg-white p-6"
                 >
-                  {/* Chapter title */}
-
-                  <h4 className="text-xl font-semibold">Chapter {index + 1}</h4>
-
-                  {/* Difficulty */}
-
-                  {chapter.result?.difficulty_rating && (
-                    <p className="mt-1 text-xs text-zinc-500">
-                      Difficulty: {chapter.result.difficulty_rating}/5
-                    </p>
-                  )}
+                  <h4 className="text-lg font-semibold">Chapter {index + 1}</h4>
 
                   {/* Blocks */}
 
-                  <div className="mt-6 space-y-6">
+                  <div className="mt-5 space-y-4">
                     {chapter.result?.blocks?.map((block, blockIndex) => (
                       <DeepDiveBlock key={blockIndex} block={block} />
                     ))}
@@ -352,20 +456,20 @@ export default function Home() {
 
                   {chapter.result?.key_concepts &&
                     chapter.result.key_concepts.length > 0 && (
-                      <div className="mt-8">
-                        <h5 className="text-sm font-medium text-zinc-400">
-                          Key concepts
-                        </h5>
+                      <div className="mt-6">
+                        <h5 className="font-semibold">Key Concepts</h5>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          {chapter.result.key_concepts.map((concept, i) => (
-                            <span
-                              key={i}
-                              className="rounded-full bg-zinc-800 px-3 py-1 text-xs text-zinc-300"
-                            >
-                              {concept}
-                            </span>
-                          ))}
+                          {chapter.result.key_concepts.map(
+                            (concept, conceptIndex) => (
+                              <span
+                                key={conceptIndex}
+                                className="rounded-full bg-gray-100 px-3 py-1 text-sm"
+                              >
+                                {concept}
+                              </span>
+                            )
+                          )}
                         </div>
                       </div>
                     )}
@@ -374,156 +478,132 @@ export default function Home() {
             </div>
           </section>
 
-          {/* --------------------------------
+          {/* ==================================================
               RAG
-          -------------------------------- */}
+          ================================================== */}
 
-          <section className="mt-16 border-t border-zinc-800 pt-10">
-            <h3 className="text-2xl font-semibold">Ask MindBook</h3>
+          <section className="mt-12 rounded-2xl border bg-white p-6">
+            <h3 className="text-2xl font-bold">Ask MindBook</h3>
 
-            <p className="mt-2 text-sm text-zinc-500">
+            <p className="mt-2 text-gray-600">
               Ask questions about this video.
             </p>
 
-            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <input
                 type="text"
                 value={question}
                 onChange={(e) => setQuestion(e.target.value)}
+                placeholder="Ask something..."
+                className="flex-1 rounded-xl border px-4 py-3 outline-none focus:border-black"
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     handleAsk();
                   }
                 }}
-                placeholder="Ask something about this video..."
-                className="h-12 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-4 outline-none placeholder:text-zinc-500 focus:border-zinc-500"
               />
 
               <button
                 onClick={handleAsk}
-                disabled={asking || !question.trim()}
-                className="h-12 rounded-lg bg-white px-6 font-medium text-black hover:bg-zinc-200 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={asking}
+                className="rounded-xl bg-black px-6 py-3 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {asking ? "Thinking..." : "Ask"}
               </button>
             </div>
 
+            {/* RAG error */}
+
             {askError && (
-              <p className="mt-4 text-sm text-red-400">{askError}</p>
+              <p className="mt-4 text-sm text-red-600">{askError}</p>
             )}
 
-            {answer && (
-              <div className="mt-6 rounded-lg border border-zinc-800 bg-zinc-900 p-6">
-                <h4 className="text-sm font-medium text-zinc-400">Answer</h4>
+            {/* RAG answer */}
 
-                <p className="mt-3 whitespace-pre-line leading-7 text-zinc-200">
+            {answer && (
+              <div className="mt-6 rounded-xl bg-gray-50 p-5">
+                <h4 className="font-semibold">Answer</h4>
+
+                <p className="mt-3 whitespace-pre-line leading-7 text-gray-700">
                   {answer}
                 </p>
               </div>
             )}
           </section>
-
-          {/* --------------------------------
-              Footer
-          -------------------------------- */}
-
-          <footer className="mt-16 border-t border-zinc-800 py-8 text-center text-sm text-zinc-600">
-            MindBook
-          </footer>
-        </div>
+        </section>
       )}
+
+      {/* ======================================================
+          FOOTER
+      ====================================================== */}
+
+      <footer className="py-10 text-center text-sm text-gray-400">
+        MindBook
+      </footer>
     </main>
   );
 }
 
-/* ============================================================
-   Deep Dive Block
-   ============================================================ */
+// ============================================================
+// DEEP DIVE BLOCK
+// ============================================================
 
 function DeepDiveBlock({ block }: { block: DeepDiveBlock }) {
-  // Heading
-  if (block.type === "heading") {
-    return <h5 className="text-xl font-semibold">{block.content}</h5>;
+  if (!block.content) {
+    return null;
   }
 
-  // Paragraph
-  if (block.type === "paragraph") {
-    return (
-      <p className="whitespace-pre-line leading-8 text-zinc-300">
-        {block.content}
-      </p>
-    );
+  // Heading
+
+  if (block.type === "heading") {
+    return <h5 className="text-lg font-semibold">{block.content}</h5>;
   }
 
   // Code
+
   if (block.type === "code") {
     return (
-      <div className="overflow-hidden rounded-lg border border-zinc-800 bg-black">
-        <div className="border-b border-zinc-800 px-4 py-2 text-xs text-zinc-500">
-          {block.caption || block.language || "Code"}
-        </div>
-
-        <pre className="overflow-x-auto p-4 text-sm leading-6 text-zinc-300">
-          <code>{block.content}</code>
-        </pre>
-      </div>
-    );
-  }
-
-  // Callout
-  if (block.type === "callout") {
-    return (
-      <div className="border-l-4 border-zinc-500 bg-zinc-900 px-5 py-4">
-        <p className="text-sm font-medium text-zinc-400">
-          {block.variant || "Note"}
-        </p>
-
-        <p className="mt-2 leading-7 text-zinc-300">{block.content}</p>
-      </div>
+      <pre className="overflow-x-auto rounded-xl bg-gray-900 p-4 text-sm text-white">
+        <code>{block.content}</code>
+      </pre>
     );
   }
 
   // ASCII diagram
+
   if (block.type === "ascii_diagram") {
     return (
-      <pre className="overflow-x-auto rounded-lg bg-black p-5 text-sm leading-6 text-zinc-300">
+      <pre className="overflow-x-auto rounded-xl bg-gray-50 p-4 text-sm">
         {block.content}
       </pre>
     );
   }
 
-  // Table
-  if (block.type === "table") {
-    const rows = block.content.split("\n").filter((row) => row.trim());
+  // Callout
 
+  if (block.type === "callout") {
     return (
-      <div className="overflow-x-auto rounded-lg border border-zinc-800">
-        <table className="w-full text-left text-sm">
-          <tbody>
-            {rows.map((row, index) => {
-              const cells = row
-                .split("|")
-                .map((cell) => cell.trim())
-                .filter(Boolean);
-
-              return (
-                <tr
-                  key={index}
-                  className="border-b border-zinc-800 last:border-b-0"
-                >
-                  {cells.map((cell, cellIndex) => (
-                    <td key={cellIndex} className="px-4 py-3 text-zinc-300">
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+      <div className="rounded-xl border-l-4 border-gray-400 bg-gray-50 p-4">
+        <p className="text-gray-700">{block.content}</p>
       </div>
     );
   }
 
-  return null;
+  // Table
+
+  if (block.type === "table") {
+    return (
+      <div className="overflow-x-auto rounded-xl border">
+        <pre className="p-4 text-sm">{block.content}</pre>
+      </div>
+    );
+  }
+
+  // Default paragraph
+
+  return (
+    <p className="whitespace-pre-line leading-7 text-gray-700">
+      {block.content}
+    </p>
+  );
 }
