@@ -1,6 +1,3 @@
-# from typing import Any
-
-
 def _default_result() -> dict:
     return {
         "blocks": [],
@@ -44,12 +41,12 @@ def _normalize_single_result(result: dict) -> dict:
 
 def normalize_deep_dive_result(result: dict) -> list[dict]:
     if not isinstance(result, dict):
-        return []
+        raise ValueError("L5 response must be a JSON object")
 
     raw_results = result.get("results")
 
     if not isinstance(raw_results, list):
-        return []
+        raise ValueError("L5 response must contain a 'results' list")
 
     normalized_results = []
 
@@ -59,7 +56,6 @@ def normalize_deep_dive_result(result: dict) -> list[dict]:
 
         chunk_id = item.get("chunk_id")
 
-        # chunk_id 0 is valid, so don't use: if not chunk_id
         if chunk_id is None:
             continue
 
@@ -69,5 +65,8 @@ def normalize_deep_dive_result(result: dict) -> list[dict]:
                 "result": _normalize_single_result(item),
             }
         )
+
+    if not normalized_results:
+        raise ValueError("L5 response contained no valid chunk results")
 
     return normalized_results

@@ -39,7 +39,7 @@ class MongoStorage(BaseStorage):
         )
 
         self.deep_dive.create_index(
-            "video_id",
+            [("video_id", 1), ("chunk_id", 1)],
             unique=True,
         )
 
@@ -164,41 +164,73 @@ class MongoStorage(BaseStorage):
 
         return document.get("result")
 
-    # ---------------------------------------------------------
-    # L5 Synthesis Parse ( DEEP SUMMARIES )
-    # ---------------------------------------------------------
+    # =========================================================
 
-    def save_deep_dive(
+    # L5 - DEEP DIVE
+    # =========================================================
+
+    def save_deep_dive_chunk(
         self,
         video_id: str,
-        results: list[dict],
+        chunk_id: str,
+        chunk_index: int,
+        result: dict,
     ) -> None:
 
         document = {
             "video_id": video_id,
-            "results": results,
+            "chunk_id": chunk_id,
+            "chunk_index": chunk_index,
+            "result": result,
+            "status": "completed",
         }
 
         self.deep_dive.replace_one(
-            {"video_id": video_id},
+            {
+                "video_id": video_id,
+                "chunk_id": chunk_id,
+            },
             document,
             upsert=True,
         )
 
-    def get_deep_dive(
+    def get_deep_dive_chunk(
         self,
         video_id: str,
-    ) -> list[dict] | None:
+        chunk_id: str,
+    ) -> dict | None:
 
-        document = self.deep_dive.find_one({"video_id": video_id})
+        document = self.deep_dive.find_one(
+            {
+                "video_id": video_id,
+                "chunk_id": chunk_id,
+            }
+        )
 
         if document is None:
             return None
 
-        return document.get("results")
+        return document.get("result")
 
-    def close(self) -> None:
-        self.client.close()
+    def get_deep_dive(
+        self,
+        video_id: str,
+    ) -> list[dict]:
+
+        documents = self.deep_dive.find(
+            {
+                "video_id": video_id,
+            }
+        ).sort(
+            "chunk_index",
+            1,
+        )
+
+        return [
+            document["result"]
+            for document in documents
+            if document.get("result") is not None
+        ]
 
     # ---------------------------------------------------------
     # L6 Synthesis Service
@@ -265,3 +297,10 @@ class MongoStorage(BaseStorage):
             return None
 
         return document.get("result")
+
+    # ---------------------------------------------------------
+    # Connection
+    # ---------------------------------------------------------
+
+    def close(self) -> None:
+        self.client.close()

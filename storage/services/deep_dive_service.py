@@ -13,7 +13,6 @@ from storage.services.transcript_service import TranscriptService
 
 
 class DeepDiveService:
-
     BATCH_SIZE = 1
     REQUEST_GAP_SECONDS = 1.5
 
@@ -23,21 +22,42 @@ class DeepDiveService:
         rag_index_service: Optional[RAGIndexService] = None,
         embedding_model=None,
     ):
+        # -----------------------------------------------------
+        # Cache
+        # -----------------------------------------------------
 
         self.cache = MemoryCache()
+
+        # -----------------------------------------------------
+        # Database
+        # -----------------------------------------------------
+
         self.db = db or MongoStorage()
 
+        # -----------------------------------------------------
+        # Dependent services
+        # -----------------------------------------------------
+
         self.transcript_service = TranscriptService(db=self.db)
+
         self.content_parse_service = ContentParseService(db=self.db)
 
-        self.llm_service = OpenrouterService()
-        self.rag_index_service = rag_index_service
+        # -----------------------------------------------------
+        # L5 LLM
+        # -----------------------------------------------------
 
+        self.llm_service = OpenrouterService()
+
+        # -----------------------------------------------------
+        # Optional RAG dependencies
+        # -----------------------------------------------------
+
+        self.rag_index_service = rag_index_service
         self.embedding_model = embedding_model
 
-    # --------------------------------------------------
-    # Save complete L5 result for one video
-    # --------------------------------------------------
+    # =========================================================
+    # CACHE
+    # =========================================================
 
     def save(
         self,
@@ -45,33 +65,40 @@ class DeepDiveService:
         results: list[dict],
     ) -> None:
 
-        # Cache whole video result
         self.cache.set(
             video_id,
             results,
         )
 
-        # MongoDB: ONE document per video
-        self.db.save_deep_dive(
-            video_id=video_id,
-            results=results,
-        )
+        # NOTE:
+        # We intentionally DO NOT save the whole video
+        # to MongoDB here anymore.
+        #
+        # Each L5 chunk is saved separately using:
+        #
+        # self.db.save_deep_dive_chunk(...)
+        #
+        # This method is now only useful for cache updates.
 
-    # --------------------------------------------------
-    # Get Deep Dive
-    # --------------------------------------------------
+    # =========================================================
+    # GET / RUN L5
+    # =========================================================
 
     async def get(
         self,
         video_id: str,
         on_batch: (
-            Callable[[list[dict], int, int], Awaitable[None] | None] | None
+            Callable[
+                [list[dict], int, int],
+                Awaitable[None] | None,
+            ]
+            | None
         ) = None,
     ) -> list[dict] | None:
 
-        # --------------------------------------------------
-        # 1. Check cache
-        # --------------------------------------------------
+        # =====================================================
+        # 1. CHECK MEMORY CACHE
+        # =====================================================
 
         cached = self.cache.get(video_id)
 
@@ -80,19 +107,27 @@ class DeepDiveService:
             print("Cache Hit")
 
             if on_batch:
+
                 for index, item in enumerate(cached):
-                    emitted = on_batch([item], index, len(cached))
+
+                    emitted = on_batch(
+                        [item],
+                        index,
+                        len(cached),
+                    )
+
                     if inspect.isawaitable(emitted):
                         await emitted
+
             return cached
 
-        # --------------------------------------------------
-        # 2. Check MongoDB
-        # --------------------------------------------------
+        # =====================================================
+        # 2. CHECK MONGODB
+        # =====================================================
 
         stored = self.db.get_deep_dive(video_id)
 
-        if stored is not None:
+        if stored:
 
             print("Loaded from DB")
 
@@ -102,39 +137,56 @@ class DeepDiveService:
             )
 
             if on_batch:
+
                 for index, item in enumerate(stored):
-                    emitted = on_batch([item], index, len(stored))
+
+                    emitted = on_batch(
+                        [item],
+                        index,
+                        len(stored),
+                    )
+
                     if inspect.isawaitable(emitted):
                         await emitted
+
             return stored
 
-        # --------------------------------------------------
-        # 3. Get transcript from L1
-        # --------------------------------------------------
+        # =====================================================
+        # 3. GET TRANSCRIPT
+        # =====================================================
 
         transcript = self.transcript_service.get(video_id)
 
         if transcript is None:
             return None
 
-        # --------------------------------------------------
-        # 4. Get L2 parsed content
-        # --------------------------------------------------
+        # =====================================================
+        # 4. GET L2 PARSED CONTENT
+        #
+        # IMPORTANT:
+        # We already have transcript.
+        #
+        # Pass it into ContentParseService instead of allowing
+        # it to fetch the transcript again.
+        # =====================================================
 
-        parsed = await self.content_parse_service.get(video_id)
+        parsed = await self.content_parse_service.get(
+            video_id=video_id,
+            transcript=transcript,
+        )
 
         if parsed is None:
             return None
 
-        # --------------------------------------------------
-        # 5. Video information
-        # --------------------------------------------------
+        # =====================================================
+        # 5. VIDEO INFO
+        # =====================================================
 
         video_info = transcript.video_info or {}
 
-        # --------------------------------------------------
-        # 6. Create chunks
-        # --------------------------------------------------
+        # =====================================================
+        # 6. CREATE CHUNKER
+        # =====================================================
 
         chunker = TranscriptChunker(
             version=TranscriptChunker.VERSION_SEMANTIC,
@@ -142,6 +194,10 @@ class DeepDiveService:
             overlap_words=50,
             embedding_model=self.embedding_model,
         )
+
+        # =====================================================
+        # 7. CREATE CHUNKS
+        # =====================================================
 
         chunks = chunker.chunk(
             segments=transcript.segments,
@@ -152,14 +208,17 @@ class DeepDiveService:
 
         print(f"\nGenerated {len(chunks)} chunks")
 
+        # =====================================================
+        # 8. INDEX CHUNKS IN RAG
+        # =====================================================
+
         if self.rag_index_service is not None:
+
             self.rag_index_service.index_chunks(chunks)
 
-        # --------------------------------------------------
-        # 7. Process chunks in REAL batches
-        # --------------------------------------------------
-
-        all_results = []
+        # =====================================================
+        # 9. PROCESS CHUNKS
+        # =====================================================
 
         for start in range(
             0,
@@ -169,64 +228,137 @@ class DeepDiveService:
 
             batch = chunks[start : start + self.BATCH_SIZE]
 
-            print(
-                f"\nRunning L5 batch "
-                f"{start + 1}-"
-                f"{start + len(batch)}/"
-                f"{len(chunks)}"
-            )
+            # -------------------------------------------------
+            # Current BATCH_SIZE = 1
+            # -------------------------------------------------
 
-            for chunk in batch:
+            for batch_offset, chunk in enumerate(batch):
 
-                print(f"  → [{chunk['chunk_id']}] " f"{chunk.get('title', 'Untitled')}")
+                chunk_id = chunk["chunk_id"]
 
-            # --------------------------------------------------
-            # ONE LLM CALL FOR WHOLE BATCH
-            # --------------------------------------------------
+                chunk_index = start + batch_offset
 
-            batch_results = await layer5_deep_dive(
-                chunks=batch,
-                video_info=video_info,
-                parsed=parsed,
-                llm_service=self.llm_service,
-            )
+                print(
+                    f"\nChecking chunk "
+                    f"{chunk_index + 1}/"
+                    f"{len(chunks)}: "
+                    f"{chunk_id}"
+                )
 
-            # --------------------------------------------------
-            # Add batch results
-            # --------------------------------------------------
+                # =============================================
+                # 9A. CHECK IF CHUNK ALREADY EXISTS
+                # =============================================
 
-            all_results.extend(batch_results)
+                existing = self.db.get_deep_dive_chunk(
+                    video_id=video_id,
+                    chunk_id=chunk_id,
+                )
 
-            if on_batch and batch_results:
-                emitted = on_batch(batch_results, start, len(chunks))
-                if inspect.isawaitable(emitted):
-                    await emitted
+                if existing is not None:
 
-            print("✓ Batch completed")
+                    print(f"✓ Skipping {chunk_id} " f"— already completed")
+
+                    # -----------------------------------------
+                    # Emit existing result
+                    # -----------------------------------------
+
+                    if on_batch:
+
+                        emitted = on_batch(
+                            [existing],
+                            chunk_index,
+                            len(chunks),
+                        )
+
+                        if inspect.isawaitable(emitted):
+                            await emitted
+
+                    continue
+
+                # =============================================
+                # 9B. RUN L5
+                # =============================================
+
+                print(f"→ Running L5 for {chunk_id}")
+
+                batch_results = await layer5_deep_dive(
+                    chunks=batch,
+                    video_info=video_info,
+                    parsed=parsed,
+                    llm_service=self.llm_service,
+                )
+
+                # =============================================
+                # 9C. SAVE EACH RESULT IMMEDIATELY
+                # =============================================
+
+                for result_offset, result in enumerate(batch_results):
+
+                    result_chunk_id = result["chunk_id"]
+
+                    result_chunk_index = chunk_index + result_offset
+
+                    self.db.save_deep_dive_chunk(
+                        video_id=video_id,
+                        chunk_id=result_chunk_id,
+                        chunk_index=result_chunk_index,
+                        result=result,
+                    )
+
+                    print(f"✓ Saved " f"{result_chunk_id} " f"to MongoDB")
+
+                # =============================================
+                # 9D. EMIT RESULT
+                # =============================================
+
+                if on_batch and batch_results:
+
+                    emitted = on_batch(
+                        batch_results,
+                        chunk_index,
+                        len(chunks),
+                    )
+
+                    if inspect.isawaitable(emitted):
+                        await emitted
+
+                print("✓ Chunk completed")
+
+            # =================================================
+            # 10. REQUEST GAP
+            # =================================================
 
             if start + self.BATCH_SIZE < len(chunks):
+
                 await asyncio.sleep(self.REQUEST_GAP_SECONDS)
 
-        # --------------------------------------------------
-        # 8. Save ONE document
-        # --------------------------------------------------
+        # =====================================================
+        # 11. LOAD ALL COMPLETED RESULTS
+        # =====================================================
 
-        self.save(
-            video_id=video_id,
-            results=all_results,
+        all_results = self.db.get_deep_dive(video_id)
+
+        # =====================================================
+        # 12. UPDATE CACHE
+        # =====================================================
+
+        self.cache.set(
+            video_id,
+            all_results,
         )
 
-        # --------------------------------------------------
-        # 9. Return
-        # --------------------------------------------------
+        # =====================================================
+        # 13. RETURN
+        # =====================================================
 
         return all_results
 
-    # --------------------------------------------------
-    # Close
-    # --------------------------------------------------
+    # =========================================================
+    # CLOSE
+    # =========================================================
 
-    def close(self):
+    def close(self) -> None:
+
         if self.rag_index_service is not None:
             self.rag_index_service.close()
 

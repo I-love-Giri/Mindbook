@@ -81,14 +81,7 @@ async def layer3_knowledge_graph(
             "Layer 3 knowledge graph generation failed: %s",
             exc,
         )
-
-        return {
-            "nodes": [],
-            "edges": [],
-            "concept_tree": {},
-            "dependency_order": [],
-            "mermaid": "",
-        }
+        raise
 
     # ---------------------------------------------------------
     # Parse response
@@ -119,10 +112,6 @@ if __name__ == "__main__":
 
     llm_service = LLMService()
 
-    # transcript_service = YoutubeTranscriptService()
-
-    # transcript = transcript_service.fetch_transcript(id)
-
     transcript_service = TranscriptService()
     transcript = transcript_service.get(id)
 
@@ -135,12 +124,6 @@ if __name__ == "__main__":
             llm_service=llm_service,
         )
     )
-
-    # print(json.dumps(layer2_result, indent=2))
-
-    # video_info = extract_chapters_and_info(video_id)
-
-    # transcript = YoutubeTranscriptService().fetch_transcript(video_id)
 
     layer3_result = asyncio.run(
         layer3_knowledge_graph(

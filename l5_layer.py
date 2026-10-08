@@ -145,13 +145,11 @@ async def layer5_deep_dive(
         return normalize_deep_dive_result(raw)
 
     except Exception as exc:
-
         logger.exception(
             "L5 batch failed: %s",
             exc,
         )
-
-        return []
+        raise
 
 
 """if __name__ == "__main__":

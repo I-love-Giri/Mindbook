@@ -1,4 +1,4 @@
-print("=== DEBUG: checking transformers ===")
+"""print("=== DEBUG: checking transformers ===")
 
 try:
     import transformers
@@ -10,8 +10,7 @@ try:
     print("DEBUG: PreTrainedModel import OK")
 
 except Exception as e:
-    print("DEBUG: PreTrainedModel import FAILED:", repr(e))
-
+    print("DEBUG: PreTrainedModel import FAILED:", repr(e))"""
 
 import asyncio
 import json

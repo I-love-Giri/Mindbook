@@ -134,18 +134,7 @@ async def layer6_synthesis(
             "L6 synthesis failed: %s",
             exc,
         )
-
-        return {
-            "complete_guide": "",
-            "executive_summary": "",
-            "faq": [],
-            "gaps": "",
-            "related_concepts": [],
-            "next_steps": [],
-            "flashcards": [],
-            "key_terms": [],
-            "difficulty_progression": [],
-        }
+        raise
 
 
 if __name__ == "__main__":
