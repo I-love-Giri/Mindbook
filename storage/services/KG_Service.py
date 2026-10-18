@@ -10,14 +10,18 @@ from storage.services.transcript_service import TranscriptService
 
 class KGService:
 
-    def __init__(self, db: Optional[MongoStorage] = None):
-        self.cache = MemoryCache()
+    def __init__(
+        self,
+        db: Optional[MongoStorage] = None,
+        cache: Optional[MemoryCache] = None,
+    ):
+        self.cache = cache or MemoryCache()
         self.db = db or MongoStorage()
 
-        self.transcript_service = TranscriptService(db=self.db)
+        self.transcript_service = TranscriptService(db=self.db, cache=self.cache)
 
         # L2 service
-        self.content_parse_service = ContentParseService(db=self.db)
+        self.content_parse_service = ContentParseService(db=self.db, cache=self.cache)
 
         self.llm_service = LLMService()
 
@@ -28,7 +32,7 @@ class KGService:
     ) -> None:
 
         # Cache
-        self.cache.set(video_id, result)
+        self.cache.set(f"kg:{video_id}", result)
 
         # Database
         self.db.save_knowledge_graph(
@@ -39,10 +43,12 @@ class KGService:
     async def get(
         self,
         video_id: str,
+        transcript=None,
+        layer2_result=None,
     ) -> dict | None:
 
         # 1. Cache
-        result = self.cache.get(video_id)
+        result = self.cache.get(f"kg:{video_id}")
 
         if result is not None:
             print("Cache Hit")
@@ -55,23 +61,25 @@ class KGService:
             print("Loaded from DB")
 
             self.cache.set(
-                video_id,
+                f"kg:{video_id}",
                 result,
             )
 
             return result
 
         # 3. Transcript
-        transcript = self.transcript_service.get(video_id)
+        if transcript is None:
+            transcript = self.transcript_service.get(video_id)
 
         if transcript is None:
             return None
 
         # 4. L2 layer
-        layer2_result = await self.content_parse_service.get(
-            video_id,
-            transcript=transcript,
-        )
+        if layer2_result is None:
+            layer2_result = await self.content_parse_service.get(
+                video_id,
+                transcript=transcript,
+            )
 
         if layer2_result is None:
             return None

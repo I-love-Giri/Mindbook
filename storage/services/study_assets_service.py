@@ -1,3 +1,4 @@
+import asyncio
 from typing import Optional
 
 from cache.memory_cache import MemoryCache
@@ -8,30 +9,32 @@ from storage.services.ContentParseService import ContentParseService  # l2
 from storage.services.KG_Service import KGService  # l3
 from storage.services.deep_dive_service import DeepDiveService  # l5
 from storage.services.synthesis_service import SynthesisService  # l6
-
-
 from storage.services.transcript_service import TranscriptService
 
 
 class StudyAssetsService:
 
-    def __init__(self, db: Optional[MongoStorage] = None):
-        self.cache = MemoryCache()
+    def __init__(
+        self,
+        db: Optional[MongoStorage] = None,
+        cache: Optional[MemoryCache] = None,
+    ):
+        self.cache = cache or MemoryCache()
         self.db = db or MongoStorage()
 
-        self.transcript_service = TranscriptService(db=self.db)
+        self.transcript_service = TranscriptService(db=self.db, cache=self.cache)
 
         # L2 service
-        self.content_parse_service = ContentParseService(db=self.db)
+        self.content_parse_service = ContentParseService(db=self.db, cache=self.cache)
 
-        # l3
-        self.kg_service = KGService(db=self.db)
+        # L3 service
+        self.kg_service = KGService(db=self.db, cache=self.cache)
 
-        # l5
-        self.deep_dive_service = DeepDiveService(db=self.db)
+        # L5 service
+        self.deep_dive_service = DeepDiveService(db=self.db, cache=self.cache)
 
-        # l6
-        self.synthesis_service = SynthesisService(db=self.db)
+        # L6 service
+        self.synthesis_service = SynthesisService(db=self.db, cache=self.cache)
 
         self.llm_service = LLMService()
 
@@ -42,7 +45,7 @@ class StudyAssetsService:
     ) -> None:
 
         # Cache
-        self.cache.set(video_id, result)
+        self.cache.set(f"study_assets:{video_id}", result)
 
         # Database
         self.db.save_study_assets(
@@ -53,10 +56,14 @@ class StudyAssetsService:
     async def get(
         self,
         video_id: str,
+        sections=None,
+        synthesis=None,
+        kg=None,
+        parsed=None,
     ) -> dict | None:
 
         # 1. Cache
-        result = self.cache.get(video_id)
+        result = self.cache.get(f"study_assets:{video_id}")
 
         if result is not None:
             print("Cache Hit")
@@ -69,56 +76,63 @@ class StudyAssetsService:
             print("Loaded from DB")
 
             self.cache.set(
-                video_id,
+                f"study_assets:{video_id}",
                 result,
             )
 
             return result
 
-        # 3. Transcript
-        transcript = self.transcript_service.get(video_id)
+        # 3. L2 layer
+        if parsed is None:
+            parsed = await self.content_parse_service.get(video_id)
 
-        if transcript is None:
+        if parsed is None:
             return None
 
-        # 4. L2 layer
-        layer2_result = await self.content_parse_service.get(video_id)
+        # 4. L3 and L5 in parallel
+        kg_task = (
+            self.kg_service.get(video_id, layer2_result=parsed)
+            if kg is None
+            else None
+        )
+        sections_task = (
+            self.deep_dive_service.get(video_id, parsed=parsed)
+            if sections is None
+            else None
+        )
 
-        if layer2_result is None:
+        if kg_task and sections_task:
+            kg, sections = await asyncio.gather(kg_task, sections_task)
+        elif kg_task:
+            kg = await kg_task
+        elif sections_task:
+            sections = await sections_task
+
+        if kg is None or sections is None:
             return None
 
-        # 5. L3 layer
+        # 5. L6 layer
+        if synthesis is None:
+            synthesis = await self.synthesis_service.get(
+                video_id,
+                parsed=parsed,
+                kg=kg,
+                sections=sections,
+            )
 
-        layer3_result = await self.kg_service.get(video_id)
-
-        if layer3_result is None:
+        if synthesis is None:
             return None
 
-        # 6. l5 layer
-
-        layer5_result = await self.deep_dive_service.get(video_id)
-
-        if layer5_result is None:
-            return None
-
-        # 7. l6 layer
-
-        layer6_result = await self.synthesis_service.get(video_id)
-
-        if layer6_result is None:
-            return None
-
-        # 8. l7 layer
-
+        # 6. L7 layer
         layer7_result = await layer7_study_assets(
-            sections=layer5_result,
-            synthesis=layer6_result,
-            kg=layer3_result,
-            parsed=layer2_result,
+            sections=sections,
+            synthesis=synthesis,
+            kg=kg,
+            parsed=parsed,
             llm_service=self.llm_service,
         )
 
-        # 6. Save L6 result
+        # 7. Save L7 result
         self.save(
             video_id=video_id,
             result=layer7_result,
@@ -128,3 +142,4 @@ class StudyAssetsService:
 
     def close(self):
         self.db.close()
+

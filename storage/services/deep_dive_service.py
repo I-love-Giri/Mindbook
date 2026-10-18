@@ -21,12 +21,13 @@ class DeepDiveService:
         db: Optional[MongoStorage] = None,
         rag_index_service: Optional[RAGIndexService] = None,
         embedding_model=None,
+        cache: Optional[MemoryCache] = None,
     ):
         # -----------------------------------------------------
         # Cache
         # -----------------------------------------------------
 
-        self.cache = MemoryCache()
+        self.cache = cache or MemoryCache()
 
         # -----------------------------------------------------
         # Database
@@ -38,9 +39,9 @@ class DeepDiveService:
         # Dependent services
         # -----------------------------------------------------
 
-        self.transcript_service = TranscriptService(db=self.db)
+        self.transcript_service = TranscriptService(db=self.db, cache=self.cache)
 
-        self.content_parse_service = ContentParseService(db=self.db)
+        self.content_parse_service = ContentParseService(db=self.db, cache=self.cache)
 
         # -----------------------------------------------------
         # L5 LLM
@@ -66,7 +67,7 @@ class DeepDiveService:
     ) -> None:
 
         self.cache.set(
-            video_id,
+            f"deep_dive:{video_id}",
             results,
         )
 
@@ -94,13 +95,15 @@ class DeepDiveService:
             ]
             | None
         ) = None,
+        transcript=None,
+        parsed=None,
     ) -> list[dict] | None:
 
         # =====================================================
         # 1. CHECK MEMORY CACHE
         # =====================================================
 
-        cached = self.cache.get(video_id)
+        cached = self.cache.get(f"deep_dive:{video_id}")
 
         if cached is not None:
 
@@ -122,17 +125,49 @@ class DeepDiveService:
             return cached
 
         # =====================================================
-        # 2. CHECK MONGODB
+        # 2. GET TRANSCRIPT & VIDEO INFO
+        # =====================================================
+
+        if transcript is None:
+            transcript = self.transcript_service.get(video_id)
+
+        if transcript is None:
+            return None
+
+        video_info = transcript.video_info or {}
+
+        # =====================================================
+        # 3. CREATE CHUNKER & CHUNKS
+        # =====================================================
+
+        chunker = TranscriptChunker(
+            version=TranscriptChunker.VERSION_SEMANTIC,
+            max_words=300,
+            overlap_words=50,
+            embedding_model=self.embedding_model,
+        )
+
+        chunks = chunker.chunk(
+            segments=transcript.segments,
+            video_id=video_id,
+            chapters=video_info.get("chapters"),
+            duration=video_info.get("duration"),
+        )
+
+        print(f"\nGenerated {len(chunks)} chunks")
+
+        # =====================================================
+        # 4. CHECK MONGODB (Verify ALL chunks are present)
         # =====================================================
 
         stored = self.db.get_deep_dive(video_id)
 
-        if stored:
+        if stored and len(stored) == len(chunks):
 
-            print("Loaded from DB")
+            print("Loaded from DB (All chunks completed)")
 
             self.cache.set(
-                video_id,
+                f"deep_dive:{video_id}",
                 stored,
             )
 
@@ -152,64 +187,20 @@ class DeepDiveService:
             return stored
 
         # =====================================================
-        # 3. GET TRANSCRIPT
+        # 5. GET L2 PARSED CONTENT (if not already provided)
         # =====================================================
 
-        transcript = self.transcript_service.get(video_id)
-
-        if transcript is None:
-            return None
-
-        # =====================================================
-        # 4. GET L2 PARSED CONTENT
-        #
-        # IMPORTANT:
-        # We already have transcript.
-        #
-        # Pass it into ContentParseService instead of allowing
-        # it to fetch the transcript again.
-        # =====================================================
-
-        parsed = await self.content_parse_service.get(
-            video_id=video_id,
-            transcript=transcript,
-        )
+        if parsed is None:
+            parsed = await self.content_parse_service.get(
+                video_id=video_id,
+                transcript=transcript,
+            )
 
         if parsed is None:
             return None
 
         # =====================================================
-        # 5. VIDEO INFO
-        # =====================================================
-
-        video_info = transcript.video_info or {}
-
-        # =====================================================
-        # 6. CREATE CHUNKER
-        # =====================================================
-
-        chunker = TranscriptChunker(
-            version=TranscriptChunker.VERSION_SEMANTIC,
-            max_words=300,
-            overlap_words=50,
-            embedding_model=self.embedding_model,
-        )
-
-        # =====================================================
-        # 7. CREATE CHUNKS
-        # =====================================================
-
-        chunks = chunker.chunk(
-            segments=transcript.segments,
-            video_id=video_id,
-            chapters=video_info.get("chapters"),
-            duration=video_info.get("duration"),
-        )
-
-        print(f"\nGenerated {len(chunks)} chunks")
-
-        # =====================================================
-        # 8. INDEX CHUNKS IN RAG
+        # 6. INDEX CHUNKS IN RAG
         # =====================================================
 
         if self.rag_index_service is not None:
@@ -343,7 +334,7 @@ class DeepDiveService:
         # =====================================================
 
         self.cache.set(
-            video_id,
+            f"deep_dive:{video_id}",
             all_results,
         )
 

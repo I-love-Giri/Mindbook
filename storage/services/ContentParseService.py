@@ -9,11 +9,15 @@ from storage.services.transcript_service import TranscriptService
 
 class ContentParseService:
 
-    def __init__(self, db: Optional[MongoStorage] = None):
-        self.cache = MemoryCache()
+    def __init__(
+        self,
+        db: Optional[MongoStorage] = None,
+        cache: Optional[MemoryCache] = None,
+    ):
+        self.cache = cache or MemoryCache()
         self.db = db or MongoStorage()
 
-        self.transcript_service = TranscriptService(db=self.db)
+        self.transcript_service = TranscriptService(db=self.db, cache=self.cache)
 
         self.llm_service = LLMService()
 
@@ -24,7 +28,7 @@ class ContentParseService:
     ) -> None:
 
         # Cache
-        self.cache.set(video_id, result)
+        self.cache.set(f"content_parse:{video_id}", result)
 
         # Database
         self.db.save_content_parse(
@@ -39,7 +43,7 @@ class ContentParseService:
     ) -> dict | None:
 
         # 1. Cache
-        result = self.cache.get(video_id)
+        result = self.cache.get(f"content_parse:{video_id}")
 
         if result is not None:
             return result
@@ -48,7 +52,7 @@ class ContentParseService:
         result = self.db.get_content_parse(video_id)
 
         if result is not None:
-            self.cache.set(video_id, result)
+            self.cache.set(f"content_parse:{video_id}", result)
             return result
 
         # 3. Transcript
@@ -72,3 +76,6 @@ class ContentParseService:
         )
 
         return layer2_result
+
+    def close(self):
+        self.db.close()
