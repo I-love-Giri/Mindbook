@@ -150,10 +150,13 @@ export default function Home() {
               }
 
               if (data.type === "error") {
-                throw new Error(data.message || "Something went wrong.");
+                const errMsg = data.message || "Something went wrong.";
+                setMessage(errMsg);
+                throw new Error(errMsg);
               }
             } catch (error) {
-              console.error("SSE parsing error:", error);
+              console.error("SSE error:", error);
+              throw error;
             }
           }
         }

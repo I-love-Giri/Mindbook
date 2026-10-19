@@ -28,6 +28,7 @@ from config.settings import (
     OPENROUTER_TEXT_MODELS,
     OPENROUTER_FAST_MODELS,
 )
+from llm.utils import clean_json_text, parse_json_safely
 
 logger = logging.getLogger(__name__)
 
@@ -253,7 +254,11 @@ class OpenrouterService:
 
         if response_schema:
 
-            return response_schema.model_validate_json(content)
+            try:
+                return response_schema.model_validate_json(content)
+            except Exception:
+                cleaned = clean_json_text(content)
+                return response_schema.model_validate_json(cleaned)
 
         # ----------------------------------------------------
         # JSON response
@@ -261,7 +266,7 @@ class OpenrouterService:
 
         if json_output:
 
-            return json.loads(content)
+            return parse_json_safely(content)
 
         # ----------------------------------------------------
         # Normal text

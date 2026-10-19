@@ -184,6 +184,7 @@ from tenacity import (
 )
 
 from config.settings import GEMINI_API_KEY, GEMINI_MODEL_NAME
+from llm.utils import clean_json_text, parse_json_safely
 
 logger = logging.getLogger(__name__)
 
@@ -282,7 +283,7 @@ class GeminiService:
                 raise ValueError("Gemini returned an empty response.")
 
             try:
-                return json.loads(content)
+                return parse_json_safely(content)
             except json.JSONDecodeError as exc:
                 logger.error(
                     "Failed to decode Gemini JSON response: %r",

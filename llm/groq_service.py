@@ -20,6 +20,7 @@ from tenacity import (
 )
 
 from config.settings import GROQ_API_KEY, MODEL_NAME
+from llm.utils import clean_json_text, parse_json_safely
 
 logger = logging.getLogger(__name__)
 
@@ -106,10 +107,14 @@ class LLMService:
             raise ValueError("LLM returned an empty response.")
 
         if response_schema:
-            return response_schema.model_validate_json(content)
+            try:
+                return response_schema.model_validate_json(content)
+            except Exception:
+                cleaned = clean_json_text(content)
+                return response_schema.model_validate_json(cleaned)
 
         if json_output:
-            return json.loads(content)
+            return parse_json_safely(content)
 
         return content.strip()
 

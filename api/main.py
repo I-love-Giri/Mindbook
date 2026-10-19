@@ -321,6 +321,8 @@ async def process_video_stream(request: VideoRequest):
                 }
             )
         except Exception as exc:
+            import traceback
+            traceback.print_exc()
             yield sse({"type": "error", "message": str(exc) or "Processing failed."})
         finally:
             for service in services:
